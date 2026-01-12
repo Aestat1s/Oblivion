@@ -1,4 +1,4 @@
-# Oblivion Launcher
+﻿# Oblivion Launcher
 
 一个类 Material Design 3 风格的 Minecraft 启动器。
 
@@ -22,7 +22,14 @@ __对虽然只有我一个人。__
 
 本项目使用 Flutter 进行开发。
 
-## how 2 build
+## 构建说明
+
+### 环境要求
+
+- Flutter SDK 3.38.6 或更高版本
+- Dart SDK 3.5.0 或更高版本
+
+### 构建步骤
 
 装好 Flutter SDK，然后：
 
@@ -34,9 +41,9 @@ flutter build windows --release
 
 构建产物在 `build/windows/x64/runner/Release/` 目录下。
 
-## 许可
+## 许可证
 
-MIT License
+本项目采用 GPL 3.0 许可证。详见 [LICENSE](LICENSE) 文件。
 
 ## 社区
 
