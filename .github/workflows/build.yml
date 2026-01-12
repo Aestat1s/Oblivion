@@ -1,0 +1,51 @@
+﻿name: Build Windows
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.0'
+          channel: 'stable'
+          cache: true
+      
+      - name: Disable analytics
+        run: flutter config --no-analytics
+      
+      - name: Get dependencies
+        run: flutter pub get
+      
+      - name: Build Windows
+        run: flutter build windows --release
+      
+      - name: Create portable package
+        run: |
+          mkdir dist
+          Copy-Item -Path "build\windows\x64\runner\Release\*" -Destination "dist\Obliv1on" -Recurse
+          Compress-Archive -Path "dist\Obliv1on\*" -DestinationPath "dist\Obliv1on-Windows-Portable.zip"
+      
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Obliv1on-Windows
+          path: dist/Obliv1on-Windows-Portable.zip
+      
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: dist/Obliv1on-Windows-Portable.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
