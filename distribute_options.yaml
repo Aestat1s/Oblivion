@@ -1,0 +1,19 @@
+output: dist/
+releases:
+  - name: windows-portable
+    jobs:
+      - name: windows-exe
+        package:
+          platform: windows
+          target: exe
+          build_args:
+            release: true
+            
+  - name: windows-installer
+    jobs:
+      - name: windows-nsis
+        package:
+          platform: windows
+          target: nsis
+          build_args:
+            release: true

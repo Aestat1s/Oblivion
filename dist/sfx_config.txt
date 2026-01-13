@@ -1,5 +1,0 @@
-;!@Install@!UTF-8!
-Title="Oblivion Launcher 安装程序"
-BeginPrompt="是否安装 Oblivion Launcher？"
-RunProgram="install.bat"
-;!@InstallEnd@!

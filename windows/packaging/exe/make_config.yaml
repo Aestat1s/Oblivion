@@ -1,0 +1,8 @@
+display_name: Oblivion Launcher
+executable_name: oblivion_launcher
+install_dir_name: Oblivion
+publisher: Aestat1s Team
+description: Obliv1on - A Minecraft Launcher
+version: 1.0.0
+build_number: 1
+app_id: com.oblivion.launcher
