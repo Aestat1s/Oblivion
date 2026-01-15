@@ -5,6 +5,7 @@ import '../services/config_service.dart';
 import '../services/java_service.dart';
 import '../models/config.dart';
 import '../l10n/app_localizations.dart';
+import '../widgets/personalization_settings.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -28,7 +29,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final config = context.watch<ConfigService>();
     final javaService = context.watch<JavaService>();
     final settings = config.settings;
-    final isWide = MediaQuery.of(context).size.width > 800;
+    final screenWidth = MediaQuery.of(context).size.width;
+    // Use two-column layout only when width is sufficient (> 900px)
+    final isWide = screenWidth > 900;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
@@ -50,6 +53,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ],
                 )
               : Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     _buildLeftColumn(config, javaService, settings, l10n),
                     _buildRightColumn(config, settings, l10n),
@@ -171,39 +175,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _buildRightColumn(ConfigService config, GlobalSettings settings, AppLocalizations l10n) {
     return Column(
       children: [
-        _buildSection(l10n.get('appearance'), Icons.palette, [
-          ListTile(
-            title: Text(l10n.get('language')),
-            trailing: SegmentedButton<String>(
-              segments: const [
-                ButtonSegment(value: 'zh', label: Text('中文')),
-                ButtonSegment(value: 'en', label: Text('English')),
-              ],
-              selected: {settings.language},
-              onSelectionChanged: (s) {
-                settings.language = s.first;
-                config.save();
-                setState(() {});
-              },
-            ),
-          ),
-          ListTile(
-            title: Text(l10n.get('theme')),
-            trailing: SegmentedButton<ThemeMode>(
-              segments: [
-                ButtonSegment(value: ThemeMode.system, label: Text(l10n.get('theme_system'))),
-                ButtonSegment(value: ThemeMode.light, label: Text(l10n.get('theme_light'))),
-                ButtonSegment(value: ThemeMode.dark, label: Text(l10n.get('theme_dark'))),
-              ],
-              selected: {settings.themeMode},
-              onSelectionChanged: (s) {
-                settings.themeMode = s.first;
-                config.save();
-                setState(() {});
-              },
-            ),
-          ),
-        ]),
+        const PersonalizationSettings(),
         _buildSection(l10n.get('memory_settings'), Icons.memory, [
           SwitchListTile(
             title: Text(l10n.get('dynamic_memory')),

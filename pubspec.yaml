@@ -1,7 +1,7 @@
 name: "oblivion_launcher"
 description: "Obliv1on - A Minecraft Launcher"
 publish_to: "none"
-version: "1.0.0+1"
+version: "1.0.1+2"
 environment:
   sdk: ">=3.5.0 <4.0.0"
 dependencies:
@@ -21,9 +21,18 @@ dependencies:
   shared_preferences: "^2.2.2"
   window_manager: "^0.3.8"
   desktop_drop: "^0.4.4"
+  flutter_acrylic: ^1.1.4
+  cached_network_image: ^3.3.1
+  flutter_colorpicker: ^1.1.0
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
 flutter:
   uses-material-design: true
+  assets:
+    - assets/icon.png
+  fonts:
+    - family: NotoSansSC
+      fonts:
+        - asset: assets/NotoSansSC-6.ttf

@@ -3,6 +3,7 @@
 
 #include <flutter/dart_project.h>
 #include <flutter/flutter_view_controller.h>
+#include <dwmapi.h>
 
 #include <memory>
 
@@ -28,6 +29,9 @@ class FlutterWindow : public Win32Window {
 
   // The Flutter instance hosted by this window.
   std::unique_ptr<flutter::FlutterViewController> flutter_controller_;
+  
+  // Setup method channel for system color
+  void SetupMethodChannel();
 };
 
 #endif  // RUNNER_FLUTTER_WINDOW_H_

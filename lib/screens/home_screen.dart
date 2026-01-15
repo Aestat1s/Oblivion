@@ -1,6 +1,5 @@
 ﻿import 'dart:convert';
 import 'dart:io';
-import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:http/http.dart' as http;
@@ -240,12 +239,10 @@ class _HomeScreenState extends State<HomeScreen> {
     final configService = context.read<ConfigService>();
     final gameService = context.read<GameService>();
     
-    
     JavaInfo? java;
     String javaStatus = '';
     
     if (configService.settings.autoSelectJava) {
-      
       final selectedVersion = gameService.selectedVersion;
       if (selectedVersion != null) {
         final version = gameService.getInstalledVersion(selectedVersion);
@@ -258,10 +255,9 @@ class _HomeScreenState extends State<HomeScreen> {
         javaStatus = '自动';
       }
     } else {
-      
       final javaPath = configService.settings.javaPath;
       if (javaPath != null && javaPath.isNotEmpty) {
-        java = service.detectedJavas.where((j) => j.path == javaPath).firstOrNull;
+        java = service.getJavaByPath(javaPath);
       }
       java ??= service.detectedJavas.isNotEmpty ? service.detectedJavas.first : null;
       javaStatus = '手动';
@@ -301,6 +297,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       configService.settings.autoSelectJava = v;
                       configService.save();
                       setDialogState(() {});
+                      setState(() {});
                     },
                   ),
                   const Divider(),
@@ -317,6 +314,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         itemBuilder: (context, index) {
                           final java = javas[index];
                           final isSelected = configService.settings.javaPath == java.path;
+                          final isCustom = javaService.customJavaPaths.contains(java.path);
                           return ListTile(
                             leading: CircleAvatar(
                               backgroundColor: isSelected
@@ -327,7 +325,25 @@ class _HomeScreenState extends State<HomeScreen> {
                                 fontSize: 12,
                               )),
                             ),
-                            title: Text('Java ${java.majorVersion}'),
+                            title: Row(
+                              children: [
+                                Text('Java ${java.majorVersion}'),
+                                if (isCustom) ...[
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: Theme.of(context).colorScheme.tertiaryContainer,
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text('自定义', style: TextStyle(
+                                      fontSize: 10,
+                                      color: Theme.of(context).colorScheme.onTertiaryContainer,
+                                    )),
+                                  ),
+                                ],
+                              ],
+                            ),
                             subtitle: Text('${java.vendor} - ${java.path}', maxLines: 1, overflow: TextOverflow.ellipsis),
                             trailing: isSelected && !autoSelect ? const Icon(Icons.check) : null,
                             enabled: !autoSelect,
@@ -335,6 +351,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               configService.settings.javaPath = java.path;
                               configService.save();
                               setDialogState(() {});
+                              setState(() {});
                             },
                           );
                         },
@@ -344,6 +361,31 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             actions: [
+              TextButton.icon(
+                onPressed: () async {
+                  final result = await FilePicker.platform.pickFiles(
+                    type: FileType.custom,
+                    allowedExtensions: ['exe'],
+                    dialogTitle: l10n.get('select'),
+                  );
+                  if (result != null && result.files.single.path != null) {
+                    final path = result.files.single.path!;
+                    final success = await javaService.addCustomJava(path);
+                    if (success) {
+                      setDialogState(() {});
+                      setState(() {});
+                    } else {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(l10n.get('error'))),
+                        );
+                      }
+                    }
+                  }
+                },
+                icon: const Icon(Icons.add),
+                label: Text(l10n.get('add')),
+              ),
               TextButton(
                 onPressed: () {
                   javaService.scanJava();

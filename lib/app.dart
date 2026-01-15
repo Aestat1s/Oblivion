@@ -3,6 +3,8 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'screens/main_screen.dart';
 import 'services/config_service.dart';
+import 'services/theme_service.dart';
+import 'models/config.dart';
 import 'l10n/app_localizations.dart';
 
 class OblivionApp extends StatelessWidget {
@@ -11,18 +13,28 @@ class OblivionApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final configService = context.watch<ConfigService>();
-    final themeMode = configService.settings.themeMode;
+    final themeService = context.watch<ThemeService>();
+    final settings = configService.settings;
+    final themeMode = settings.themeMode;
     final isDark = themeMode == ThemeMode.dark ||
         (themeMode == ThemeMode.system &&
             MediaQuery.platformBrightnessOf(context) == Brightness.dark);
     
-    final locale = configService.settings.language == 'zh' 
+    final locale = settings.language == 'zh' 
         ? const Locale('zh') 
         : const Locale('en');
 
+    // Use custom seed color from ThemeService if available
+    final seedColor = themeService.seedColor ?? const Color(0xFF6750A4);
+    
+    // Check if we have a custom background
+    final hasCustomBackground = settings.backgroundType != BackgroundType.none;
+    
+    // Surface opacity for controls when background is enabled
+    final surfaceOpacity = hasCustomBackground ? 0.85 : 1.0;
     
     final colorScheme = ColorScheme.fromSeed(
-      seedColor: const Color(0xFF6750A4),
+      seedColor: seedColor,
       brightness: isDark ? Brightness.dark : Brightness.light,
     );
 
@@ -40,14 +52,15 @@ class OblivionApp extends StatelessWidget {
       theme: ThemeData(
         colorScheme: colorScheme,
         useMaterial3: true,
+        scaffoldBackgroundColor: hasCustomBackground ? Colors.transparent : null,
         cardTheme: CardTheme(
           elevation: 0,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          color: colorScheme.surfaceContainerHigh,
+          color: colorScheme.surfaceContainerHigh.withValues(alpha: surfaceOpacity),
         ),
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
-          fillColor: colorScheme.surfaceContainerHighest,
+          fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: surfaceOpacity),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide.none,
@@ -73,14 +86,17 @@ class OblivionApp extends StatelessWidget {
         ),
         dialogTheme: DialogTheme(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-          backgroundColor: colorScheme.surfaceContainerHigh,
+          backgroundColor: colorScheme.surfaceContainerHigh.withValues(alpha: surfaceOpacity),
         ),
         navigationRailTheme: NavigationRailThemeData(
           backgroundColor: Colors.transparent,
-          indicatorColor: colorScheme.primaryContainer,
+          indicatorColor: colorScheme.primaryContainer.withValues(alpha: surfaceOpacity),
           selectedIconTheme: IconThemeData(color: colorScheme.onPrimaryContainer),
           unselectedIconTheme: IconThemeData(color: colorScheme.onSurfaceVariant),
           labelType: NavigationRailLabelType.all,
+        ),
+        navigationBarTheme: NavigationBarThemeData(
+          backgroundColor: colorScheme.surfaceContainerLow.withValues(alpha: surfaceOpacity),
         ),
       ),
       home: const MainScreen(),

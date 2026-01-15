@@ -1,0 +1,15 @@
+app_id: com.oblivion.launcher
+publisher: Aestat1s Team
+publisher_url: https://github.com/aestat1s
+display_name: Oblivion Launcher
+executable_name: oblivion_launcher
+install_dir_name: Oblivion
+description: Obliv1on - A Minecraft Launcher
+version: 1.0.1
+build_number: 2
+setup_icon_file: windows/runner/resources/app_icon.ico
+languages:
+  - name: ChineseSimplified
+    file: ChineseSimplified.isl
+  - name: English
+    file: Default.isl

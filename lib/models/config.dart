@@ -3,6 +3,8 @@ import 'account.dart';
 
 enum DownloadSource { official, bmclapi }
 enum IsolationType { none, partial, full }
+enum BackgroundType { none, image, randomImage }
+enum ThemeColorSource { system, customBackground, manual }
 
 class LauncherConfig {
   int version;
@@ -63,6 +65,17 @@ class GlobalSettings {
   String language;
   bool checkUpdates;
   IsolationType defaultIsolation;
+  
+  // 个性化设置
+  BackgroundType backgroundType;
+  String? customBackgroundPath;
+  String? randomImageApi;
+  double backgroundBlur;
+  bool enableCustomColor;
+  ThemeColorSource themeColorSource;
+  int? customThemeColor;
+  String? customFontFamily;
+  double windowOpacity;
 
   GlobalSettings({
     this.gameDirectory = '',
@@ -83,6 +96,15 @@ class GlobalSettings {
     this.language = 'zh',
     this.checkUpdates = true,
     this.defaultIsolation = IsolationType.none,
+    this.backgroundType = BackgroundType.none,
+    this.customBackgroundPath,
+    this.randomImageApi = 'https://t.alcy.cc/pc',
+    this.backgroundBlur = 0.0,
+    this.enableCustomColor = false,
+    this.themeColorSource = ThemeColorSource.system,
+    this.customThemeColor,
+    this.customFontFamily,
+    this.windowOpacity = 1.0,
   });
 
   Map<String, dynamic> toJson() => {
@@ -104,6 +126,15 @@ class GlobalSettings {
     'language': language,
     'checkUpdates': checkUpdates,
     'defaultIsolation': defaultIsolation.index,
+    'backgroundType': backgroundType.index,
+    'customBackgroundPath': customBackgroundPath,
+    'randomImageApi': randomImageApi,
+    'backgroundBlur': backgroundBlur,
+    'enableCustomColor': enableCustomColor,
+    'themeColorSource': themeColorSource.index,
+    'customThemeColor': customThemeColor,
+    'customFontFamily': customFontFamily,
+    'windowOpacity': windowOpacity,
   };
 
   factory GlobalSettings.fromJson(Map<String, dynamic> json) => GlobalSettings(
@@ -125,6 +156,15 @@ class GlobalSettings {
     language: json['language'] ?? 'zh',
     checkUpdates: json['checkUpdates'] ?? true,
     defaultIsolation: IsolationType.values[json['defaultIsolation'] ?? 0],
+    backgroundType: BackgroundType.values[json['backgroundType'] ?? 0],
+    customBackgroundPath: json['customBackgroundPath'],
+    randomImageApi: json['randomImageApi'] ?? json['randomImageApiHorizontal'] ?? 'https://t.alcy.cc/pc',
+    backgroundBlur: json['backgroundBlur']?.toDouble() ?? 0.0,
+    enableCustomColor: json['enableCustomColor'] ?? false,
+    themeColorSource: ThemeColorSource.values[json['themeColorSource'] ?? 0],
+    customThemeColor: json['customThemeColor'],
+    customFontFamily: json['customFontFamily'],
+    windowOpacity: json['windowOpacity']?.toDouble() ?? 1.0,
   );
 }
 

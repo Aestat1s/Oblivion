@@ -6,14 +6,14 @@ import '../models/java_info.dart';
 
 class JavaService extends ChangeNotifier {
   List<JavaInfo> _detectedJavas = [];
+  List<String> _customJavaPaths = [];
   bool _isScanning = false;
 
   List<JavaInfo> get detectedJavas => List.unmodifiable(_detectedJavas);
+  List<String> get customJavaPaths => List.unmodifiable(_customJavaPaths);
   bool get isScanning => _isScanning;
 
-  
   static const _excludeFolderNames = {'javapath', 'java8path', 'common files'};
-  
   
   static const _javaKeywords = [
     'java', 'jdk', 'jre', 'dragonwell', 'azul', 'zulu', 'oracle', 'open',
@@ -21,22 +21,19 @@ class JavaService extends ChangeNotifier {
     'kona', 'bellsoft', 'liberica', 'graalvm', 'microsoft', 'adoptium'
   ];
 
-  
   Future<void> init() async {
     await _loadFromCache();
-    
+    await _loadCustomJavas();
     if (_detectedJavas.isEmpty) {
       await scanJava();
     }
   }
 
-  
   Future<void> _loadFromCache() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final cached = prefs.getStringList('cached_java_paths') ?? [];
       if (cached.isEmpty) return;
-      
       
       final validJavas = <JavaInfo>[];
       for (final path in cached) {
@@ -58,7 +55,49 @@ class JavaService extends ChangeNotifier {
     }
   }
 
-  
+  Future<void> _loadCustomJavas() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _customJavaPaths = prefs.getStringList('custom_java_paths') ?? [];
+    } catch (e) {
+      debugPrint('Failed to load custom Java paths: $e');
+    }
+  }
+
+  Future<void> _saveCustomJavas() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList('custom_java_paths', _customJavaPaths);
+    } catch (e) {
+      debugPrint('Failed to save custom Java paths: $e');
+    }
+  }
+
+  Future<bool> addCustomJava(String path) async {
+    if (_customJavaPaths.contains(path)) return false;
+    
+    final info = await JavaInfo.fromPath(path);
+    if (info == null) return false;
+    
+    _customJavaPaths.add(path);
+    await _saveCustomJavas();
+    
+    if (!_detectedJavas.any((j) => j.path == path)) {
+      _detectedJavas.add(info);
+      _sortJavas();
+      await _saveToCache();
+    }
+    
+    notifyListeners();
+    return true;
+  }
+
+  Future<void> removeCustomJava(String path) async {
+    _customJavaPaths.remove(path);
+    await _saveCustomJavas();
+    notifyListeners();
+  }
+
   Future<void> _saveToCache() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -77,7 +116,6 @@ class JavaService extends ChangeNotifier {
     });
   }
 
-  
   Future<void> scanJava() async {
     if (_isScanning) return;
     
@@ -87,7 +125,6 @@ class JavaService extends ChangeNotifier {
     final javaPaths = <String>{};
 
     try {
-      
       await Future.wait([
         _scanPathEnvironment(javaPaths),
         _scanJavaHome(javaPaths),
@@ -96,13 +133,13 @@ class JavaService extends ChangeNotifier {
         _scanFromWhereCommand(javaPaths),
       ]);
 
-      
+      javaPaths.addAll(_customJavaPaths);
+
       final filteredPaths = javaPaths.where((path) {
         final lowerPath = path.toLowerCase();
         return !_excludeFolderNames.any((name) => lowerPath.contains('\\$name\\'));
       }).toSet();
 
-      
       final validJavas = <JavaInfo>[];
       final seenPaths = <String>{};
       
@@ -149,7 +186,6 @@ class JavaService extends ChangeNotifier {
     }
   }
 
-  
   Future<void> _scanDefaultInstallPaths(Set<String> paths) async {
     final localAppData = Platform.environment['LOCALAPPDATA'] ?? '';
     final appData = Platform.environment['APPDATA'] ?? '';
@@ -161,13 +197,11 @@ class JavaService extends ChangeNotifier {
       userProfile,
     };
 
-    
     for (final drive in ['C', 'D']) {
       searchPaths.add('$drive:\\Program Files');
       searchPaths.add('$drive:\\Program Files (x86)');
     }
 
-    
     for (final basePath in searchPaths) {
       if (basePath.isEmpty || !await Directory(basePath).exists()) continue;
       
@@ -180,12 +214,9 @@ class JavaService extends ChangeNotifier {
             }
           }
         }
-      } catch (e) {
-        
-      }
+      } catch (e) {}
     }
 
-    
     final specificPaths = [
       p.join(appData, '.minecraft', 'runtime'),
       p.join(userProfile, '.jdks'),
@@ -217,9 +248,7 @@ class JavaService extends ChangeNotifier {
           }
         }
       }
-    } catch (e) {
-      
-    }
+    } catch (e) {}
   }
 
   Future<void> _scanDirectoryForJava(String basePath, Set<String> paths, {int maxDepth = 3}) async {
@@ -234,7 +263,6 @@ class JavaService extends ChangeNotifier {
       try {
         await for (final entity in Directory(currentPath).list()) {
           if (entity is Directory) {
-            
             final javaExe = p.join(entity.path, 'java.exe');
             if (await File(javaExe).exists()) {
               paths.add(javaExe);
@@ -250,19 +278,14 @@ class JavaService extends ChangeNotifier {
             }
           }
         }
-      } catch (e) {
-        
-      }
+      } catch (e) {}
     }
   }
 
-  
-  
   JavaInfo? selectJavaForVersion(int? requiredVersion, {int? maxVersion}) {
     if (_detectedJavas.isEmpty) return null;
     if (requiredVersion == null) return _detectedJavas.first;
 
-    
     if (maxVersion != null) {
       for (final java in _detectedJavas) {
         if (java.majorVersion >= requiredVersion && java.majorVersion <= maxVersion && java.is64Bit && !java.isJre) {
@@ -281,7 +304,6 @@ class JavaService extends ChangeNotifier {
       }
     }
 
-    
     for (final java in _detectedJavas) {
       if (java.majorVersion >= requiredVersion && java.is64Bit && !java.isJre) {
         return java;
@@ -300,16 +322,16 @@ class JavaService extends ChangeNotifier {
     return _detectedJavas.first;
   }
 
-  
-  
+  JavaInfo? getJavaByPath(String path) {
+    return _detectedJavas.where((j) => j.path == path).firstOrNull;
+  }
+
   static (int minVersion, int? maxVersion) getRequiredJavaVersion(String mcVersion) {
-    
     final parts = mcVersion.split('.');
     if (parts.length < 2) return (8, null);
     
     final major = int.tryParse(parts[0]) ?? 1;
     final minor = int.tryParse(parts[1]) ?? 0;
-    
     
     if (major >= 1 && minor >= 21) {
       return (21, null);
@@ -322,7 +344,6 @@ class JavaService extends ChangeNotifier {
     if (major >= 1 && minor >= 17) {
       return (16, null);
     }
-    
     
     return (8, 8);
   }

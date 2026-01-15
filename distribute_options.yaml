@@ -11,9 +11,9 @@ releases:
             
   - name: windows-installer
     jobs:
-      - name: windows-nsis
+      - name: windows-inno
         package:
           platform: windows
-          target: nsis
+          target: inno
           build_args:
             release: true

@@ -2,6 +2,8 @@
 import 'package:provider/provider.dart';
 import '../models/download_task.dart';
 import '../services/download_service.dart';
+import '../services/config_service.dart';
+import '../models/config.dart';
 import '../l10n/app_localizations.dart';
 
 class DownloadsScreen extends StatefulWidget {
@@ -16,72 +18,68 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final downloadService = context.watch<DownloadService>();
+    final configService = context.watch<ConfigService>();
+    final settings = configService.settings;
     final groups = downloadService.groups;
     final colorScheme = Theme.of(context).colorScheme;
 
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(l10n.get('download_management'), 
-                      style: Theme.of(context).textTheme.headlineMedium),
-                    if (downloadService.isDownloading) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        '${downloadService.completedCount}/${downloadService.totalCount} ${l10n.get('files')}',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: colorScheme.primary,
-                        ),
-                      ),
-                    ],
-                  ],
+    // 根据背景设置决定背景颜色
+    final hasCustomBackground = settings.backgroundType != BackgroundType.none;
+    final backgroundColor = hasCustomBackground 
+        ? colorScheme.surface.withOpacity(0.85)
+        : colorScheme.surface;
+
+    return Scaffold(
+      backgroundColor: backgroundColor,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.of(context).pop(),
+          tooltip: l10n.get('back'),
+        ),
+        title: Text(l10n.get('download_management')),
+        actions: [
+          if (groups.isNotEmpty) ...[
+            TextButton.icon(
+              onPressed: () => downloadService.clearCompleted(),
+              icon: const Icon(Icons.cleaning_services_outlined, size: 18),
+              label: Text(l10n.get('clear_completed')),
+            ),
+            if (downloadService.isDownloading)
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: TextButton.icon(
+                  onPressed: () => downloadService.cancelAll(),
+                  icon: Icon(Icons.stop, size: 18, color: colorScheme.error),
+                  label: Text(l10n.get('stop_all'), 
+                    style: TextStyle(color: colorScheme.error)),
                 ),
               ),
-              
-              if (groups.isNotEmpty) ...[
-                FilledButton.tonalIcon(
-                  onPressed: () => downloadService.clearCompleted(),
-                  icon: const Icon(Icons.cleaning_services_outlined),
-                  label: Text(l10n.get('clear_completed')),
-                ),
-                const SizedBox(width: 8),
-                if (downloadService.isDownloading)
-                  FilledButton.icon(
-                    onPressed: () => downloadService.cancelAll(),
-                    icon: const Icon(Icons.stop),
-                    label: Text(l10n.get('stop_all')),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: colorScheme.errorContainer,
-                      foregroundColor: colorScheme.onErrorContainer,
-                    ),
-                  ),
-              ],
-            ],
-          ),
-          const SizedBox(height: 24),
-          
-          
-          if (downloadService.isDownloading)
-            _buildOverviewCard(downloadService, colorScheme, l10n),
-          
-          if (downloadService.isDownloading)
-            const SizedBox(height: 16),
-          
-          
-          Expanded(
-            child: groups.isEmpty
-                ? _buildEmptyState(colorScheme, l10n)
-                : _buildTaskList(groups, downloadService, colorScheme, l10n),
-          ),
+          ],
         ],
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 下载进度概览
+            if (downloadService.isDownloading)
+              _buildOverviewCard(downloadService, colorScheme, l10n),
+            
+            if (downloadService.isDownloading)
+              const SizedBox(height: 16),
+            
+            // 下载列表
+            Expanded(
+              child: groups.isEmpty
+                  ? _buildEmptyState(colorScheme, l10n)
+                  : _buildTaskList(groups, downloadService, colorScheme, l10n),
+            ),
+          ],
+        ),
       ),
     );
   }

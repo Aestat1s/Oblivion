@@ -24,6 +24,8 @@ class GameService extends ChangeNotifier {
   
   Process? _gameProcess;
   bool _isGameRunning = false;
+  bool showSnapshots = false;
+  bool showOldVersions = false;
 
   GameService(this._configService) {
     _loadInstalledVersions();
