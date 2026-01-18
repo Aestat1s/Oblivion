@@ -7,3 +7,9 @@ maintainer: Aestat1s Team <obliv1on@aestat1s.com>
 version: 1.0.3
 build_number: 1
 app_id: com.oblivion.launcher
+priority: optional
+section: games
+installed_size: 102400
+essential: false
+status: install ok installed
+architecture: amd64

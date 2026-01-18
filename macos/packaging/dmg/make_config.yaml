@@ -6,3 +6,12 @@ description: Obliv1on - A Minecraft Launcher
 version: 1.0.3
 build_number: 1
 app_id: com.oblivion.launcher
+contents:
+  - x: 200
+    y: 180
+    type: file
+    path: oblivion_launcher.app
+  - x: 400
+    y: 180
+    type: link
+    path: /Applications
