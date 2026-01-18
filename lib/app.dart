@@ -54,7 +54,7 @@ class OblivionApp extends StatelessWidget {
         colorScheme: colorScheme,
         useMaterial3: true,
         scaffoldBackgroundColor: hasCustomBackground ? Colors.transparent : null,
-        cardTheme: CardTheme(
+        cardTheme: CardThemeData(
           elevation: 0,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           color: colorScheme.surfaceContainerHigh.withValues(alpha: surfaceOpacity),
@@ -85,7 +85,7 @@ class OblivionApp extends StatelessWidget {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         ),
-        dialogTheme: DialogTheme(
+        dialogTheme: DialogThemeData(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
           backgroundColor: colorScheme.surfaceContainerHigh.withValues(alpha: surfaceOpacity),
         ),
