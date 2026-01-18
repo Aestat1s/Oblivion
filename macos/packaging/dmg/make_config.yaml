@@ -1,4 +1,5 @@
 display_name: Oblivion Launcher
+title: Oblivion Launcher
 executable_name: oblivion_launcher
 icon: assets/icon.png
 publisher: Aestat1s Team
@@ -6,6 +7,7 @@ description: Obliv1on - A Minecraft Launcher
 version: 1.0.3
 build_number: 1
 app_id: com.oblivion.launcher
+identifier: com.oblivion.launcher
 contents:
   - x: 200
     y: 180

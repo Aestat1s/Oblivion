@@ -3,6 +3,9 @@ executable_name: oblivion_launcher
 icon: assets/icon.png
 publisher: Aestat1s Team
 description: Obliv1on - A Minecraft Launcher
+homepage: https://github.com/Aestat1s/Oblivion
+license: MIT
 version: 1.0.3
 build_number: 1
 app_id: com.oblivion.launcher
+identifier: com.oblivion.launcher
