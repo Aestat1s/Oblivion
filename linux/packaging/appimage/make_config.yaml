@@ -1,8 +1,12 @@
 display_name: Oblivion Launcher
+package_name: oblivion-launcher
 executable_name: oblivion_launcher
 icon: assets/icon.png
 publisher: Aestat1s Team
 description: Obliv1on - A Minecraft Launcher
+maintainer:
+  name: Aestat1s Team
+  email: obliv1on@aestat1s.com
 homepage: https://github.com/Aestat1s/Oblivion
 license: MIT
 version: 1.0.3
