@@ -23,7 +23,7 @@ class _BootstrapScreenState extends State<BootstrapScreen> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
   
-  
+  // Total pages: Intro, Account, Personalization, Install Version, Analytics, Links
   static const int _totalPages = 6;
 
   void _nextPage() {
@@ -63,18 +63,18 @@ class _BootstrapScreenState extends State<BootstrapScreen> {
       backgroundColor: Theme.of(context).colorScheme.surface,
       body: Row(
         children: [
-          
-          
-          
-          
-          
+          // Left side: Progress or Graphic?
+          // For now, let's just use a simple PageView with a bottom bar.
+          // Or maybe a side stepper? Material 3 doesn't have a strict side stepper, 
+          // but let's stick to a clean centered layout or split layout.
+          // Given desktop, a split layout looks nice.
           Expanded(
             child: Column(
               children: [
                 Expanded(
                   child: PageView(
                     controller: _pageController,
-                    physics: const NeverScrollableScrollPhysics(), 
+                    physics: const NeverScrollableScrollPhysics(), // Disable swipe
                     onPageChanged: (page) => setState(() => _currentPage = page),
                     children: [
                       const _IntroPage(),
@@ -117,7 +117,7 @@ class _BootstrapScreenState extends State<BootstrapScreen> {
           
           Row(
             children: [
-              
+              // Page indicator
               for (int i = 0; i < _totalPages; i++)
                 Container(
                   width: 8,
@@ -143,7 +143,7 @@ class _BootstrapScreenState extends State<BootstrapScreen> {
   }
 
   bool _canProceed() {
-    if (_currentPage == 1) { 
+    if (_currentPage == 1) { // Account Page
       final accountService = context.read<AccountService>();
       return accountService.accounts.isNotEmpty;
     }
@@ -151,7 +151,7 @@ class _BootstrapScreenState extends State<BootstrapScreen> {
   }
 }
 
-
+// 1. Intro Page
 class _IntroPage extends StatelessWidget {
   const _IntroPage();
 
@@ -176,7 +176,7 @@ class _IntroPage extends StatelessWidget {
           ),
           const SizedBox(height: 24),
           Text(
-            '在这里，你可以轻松管理游戏版本、模组、账号，并享受美观流畅的交互体验。',
+            '你可以轻松管理游戏版本、模组、账号，并享受神奇牛的屎山体验。',
             style: Theme.of(context).textTheme.bodyLarge,
           ),
         ],
@@ -185,7 +185,7 @@ class _IntroPage extends StatelessWidget {
   }
 }
 
-
+// 2. Account Page
 class _AccountPage extends StatelessWidget {
   const _AccountPage();
 
@@ -206,7 +206,7 @@ class _AccountPage extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Text(
-            '请至少添加一个账号以继续。支持离线、微软和外置登录（Authlib）。',
+            '请至少添加一个账号以继续。支持离线、微软和外置登录（俗称皮肤站）。',
             style: Theme.of(context).textTheme.bodyLarge,
           ),
           const SizedBox(height: 32),
@@ -260,7 +260,7 @@ class _AccountPage extends StatelessWidget {
   }
 }
 
-
+// 3. Personalization Page
 class _PersonalizationPage extends StatelessWidget {
   const _PersonalizationPage();
 
@@ -282,7 +282,7 @@ class _PersonalizationPage extends StatelessWidget {
           ),
           const SizedBox(height: 32),
           
-          
+          // Theme Mode
           Text('主题模式', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
           SegmentedButton<ThemeMode>(
@@ -298,7 +298,7 @@ class _PersonalizationPage extends StatelessWidget {
           ),
           const SizedBox(height: 24),
 
-          
+          // Background
           SwitchListTile(
             title: const Text('自定义背景'),
             value: settings.backgroundType != BackgroundType.none,
@@ -342,7 +342,7 @@ class _PersonalizationPage extends StatelessWidget {
             
           const SizedBox(height: 24),
 
-          
+          // Theme Color Source
           Text('主题取色', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
           SegmentedButton<ThemeColorSource>(
@@ -363,7 +363,7 @@ class _PersonalizationPage extends StatelessWidget {
           ),
           const SizedBox(height: 24),
 
-          
+          // Announcement
           SwitchListTile(
             title: const Text('显示首页公告'),
             value: settings.showAnnouncement,
@@ -377,7 +377,7 @@ class _PersonalizationPage extends StatelessWidget {
   }
 }
 
-
+// 4. Install Version Page
 class _InstallVersionPage extends StatefulWidget {
   const _InstallVersionPage();
 
@@ -442,7 +442,7 @@ class _InstallVersionPageState extends State<_InstallVersionPage> {
     final gameService = context.watch<GameService>();
     final versions = gameService.availableVersions;
     
-    
+    // Find latest release and snapshot
     final release = versions.where((v) => v.type == 'release').firstOrNull;
     final snapshot = versions.where((v) => v.type == 'snapshot').firstOrNull;
 
@@ -502,7 +502,7 @@ class _InstallVersionPageState extends State<_InstallVersionPage> {
   }
 }
 
-
+// 5. Analytics Page
 class _AnalyticsPage extends StatelessWidget {
   const _AnalyticsPage();
 
@@ -537,28 +537,28 @@ class _AnalyticsPage extends StatelessWidget {
           ),
           SwitchListTile(
             title: const Text('允许发送匿名统计数据'),
-            subtitle: const Text('默认开启，感谢您的支持 ❤️'),
+            subtitle: const Text('帮助我们改进启动器'),
             value: settings.enableAnalytics,
             onChanged: (value) {
               if (!value) {
-                
+                // Show begging dialog
                 showDialog(
                   context: context,
                   builder: (context) => AlertDialog(
-                    title: const Text('真的要关闭吗？🥺'),
-                    content: const Text('这些数据对我们优化启动器非常重要。\n我们承诺数据完全匿名且开源透明。\n\n拜托拜托，就在开着嘛~'),
+                    title: const Text('真的要关闭吗'),
+                    content: const Text('这些数据对我们优化启动器非常重要。\n我们承诺数据完全匿名且开源透明。'),
                     actions: [
                       TextButton(
                         onPressed: () {
-                          
+                          // Cruel user confirms disable
                           configService.updateSettings(settings.copyWith(enableAnalytics: false));
                           Navigator.of(context).pop();
                         },
-                        child: const Text('残忍拒绝'),
+                        child: const Text('我拒绝'),
                       ),
                       FilledButton(
                         onPressed: () {
-                          
+                          // User keeps it enabled
                           Navigator.of(context).pop();
                         },
                         child: const Text('保持开启'),
@@ -577,7 +577,7 @@ class _AnalyticsPage extends StatelessWidget {
   }
 }
 
-
+// 6. Links Page
 class _LinksPage extends StatelessWidget {
   const _LinksPage();
 
@@ -611,7 +611,7 @@ class _LinksPage extends StatelessWidget {
               children: [
                 ListTile(
                   leading: const Icon(Icons.code),
-                  title: const Text('GitHub 开源仓库'),
+                  title: const Text('GitHub 仓库'),
                   subtitle: const Text('github.com/Aestat1s/Oblivion'),
                   trailing: const Icon(Icons.open_in_new),
                   onTap: () => _launchUrl('https://github.com/Aestat1s/Oblivion'),
