@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -8,11 +8,18 @@ import 'game_service.dart';
 import 'debug_logger.dart';
 
 class DownloadService extends ChangeNotifier {
+  final http.Client _client = http.Client();
   final List<DownloadGroup> _groups = [];
   bool _isDownloading = false;
   int _completedCount = 0;
   int _totalCount = 0;
   int _failedCount = 0;
+
+  @override
+  void dispose() {
+    _client.close();
+    super.dispose();
+  }
 
   List<DownloadGroup> get groups => List.unmodifiable(_groups);
   bool get isDownloading => _isDownloading;
@@ -64,6 +71,7 @@ class DownloadService extends ChangeNotifier {
       group.tasks.add(DownloadTask(
         name: file.path.split('/').last.split('\\').last,
         url: file.url,
+        fallbackUrls: file.fallbackUrls,
         destinationPath: file.path,
         sha1: file.sha1,
         totalBytes: file.size ?? 0,
@@ -163,44 +171,52 @@ class DownloadService extends ChangeNotifier {
     }
 
     
-    for (int retry = 0; retry < 3; retry++) {
-      try {
-        await outFile.parent.create(recursive: true);
-        
-        final response = await http.get(Uri.parse(task.url));
-        if (response.statusCode != 200) {
-          throw Exception('HTTP ${response.statusCode}');
-        }
+    final allUrls = [task.url, ...task.fallbackUrls];
 
-        await outFile.writeAsBytes(response.bodyBytes);
-        task.downloadedBytes = response.bodyBytes.length;
-        task.totalBytes = response.bodyBytes.length;
-
-        
-        if (task.sha1 != null) {
-          final hash = sha1.convert(response.bodyBytes).toString();
-          if (hash != task.sha1) {
-            await outFile.delete();
-            throw Exception('SHA1 mismatch');
+    for (final url in allUrls) {
+      for (int retry = 0; retry < 3; retry++) {
+        try {
+          await outFile.parent.create(recursive: true);
+          
+          final response = await _client.get(Uri.parse(url))
+              .timeout(const Duration(seconds: 15));
+              
+          if (response.statusCode != 200) {
+            throw Exception('HTTP ${response.statusCode}');
           }
-        }
 
-        task.status = DownloadStatus.completed;
-        task.endTime = DateTime.now();
-        onProgress?.call(group.progress / 100);
-        notifyListeners();
-        return true;
-      } catch (e) {
-        debugPrint('Download failed (attempt ${retry + 1}): ${task.url} - $e');
-        task.retryCount = retry + 1;
-        if (retry == 2) {
-          task.status = DownloadStatus.failed;
-          task.errorMessage = e.toString();
+          await outFile.writeAsBytes(response.bodyBytes);
+          task.downloadedBytes = response.bodyBytes.length;
+          task.totalBytes = response.bodyBytes.length;
+
+          
+          if (task.sha1 != null) {
+            final hash = sha1.convert(response.bodyBytes).toString();
+            if (hash != task.sha1) {
+              await outFile.delete();
+              throw Exception('SHA1 mismatch');
+            }
+          }
+
+          task.status = DownloadStatus.completed;
           task.endTime = DateTime.now();
+          onProgress?.call(group.progress / 100);
           notifyListeners();
-          return false;
+          return true;
+        } catch (e) {
+          debugPrint('Download failed (attempt ${retry + 1}) for $url: $e');
+          task.retryCount = retry + 1;
+          
+          
+          if (retry == 2 && url == allUrls.last) {
+            task.status = DownloadStatus.failed;
+            task.errorMessage = e.toString();
+            task.endTime = DateTime.now();
+            notifyListeners();
+            return false;
+          }
+          await Future.delayed(Duration(seconds: retry + 1));
         }
-        await Future.delayed(Duration(milliseconds: 500 * (retry + 1)));
       }
     }
 
@@ -291,7 +307,9 @@ class DownloadService extends ChangeNotifier {
       try {
         await outFile.parent.create(recursive: true);
         
-        final response = await http.get(Uri.parse(file.url));
+        final response = await _client.get(Uri.parse(file.url))
+            .timeout(const Duration(seconds: 15));
+            
         if (response.statusCode != 200) {
           throw Exception('HTTP ${response.statusCode}');
         }
@@ -318,7 +336,7 @@ class DownloadService extends ChangeNotifier {
           notifyListeners();
           return false;
         }
-        await Future.delayed(Duration(milliseconds: 500 * (retry + 1)));
+        await Future.delayed(Duration(seconds: retry + 1));
       }
     }
 

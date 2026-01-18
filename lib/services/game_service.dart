@@ -1,4 +1,4 @@
-﻿import 'dart:convert';
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -7,19 +7,22 @@ import 'package:archive/archive.dart';
 import '../models/account.dart';
 import '../models/config.dart';
 import '../models/game_version.dart';
+import '../models/java_info.dart';
 import 'config_service.dart';
 import 'download_service.dart';
 import 'java_service.dart';
+import 'analytics_service.dart';
 
 class GameService extends ChangeNotifier {
   final ConfigService _configService;
+  final AnalyticsService? _analyticsService;
   final DownloadService _downloadService = DownloadService();
   
   List<GameVersion> _availableVersions = [];
   List<InstalledVersion> _installedVersions = [];
   String? _selectedVersion;
   bool _isLoading = false;
-  String _status = '';
+  final String _status = '';
   
   
   Process? _gameProcess;
@@ -27,7 +30,7 @@ class GameService extends ChangeNotifier {
   bool showSnapshots = false;
   bool showOldVersions = false;
 
-  GameService(this._configService) {
+  GameService(this._configService, [this._analyticsService]) {
     _loadInstalledVersions();
   }
 
@@ -349,20 +352,27 @@ class GameService extends ChangeNotifier {
     await _extractNatives(versionJson, nativesDir);
 
     
-    String javaPath = profile?.javaPath ?? globalSettings.javaPath ?? '';
+    
+    final baseVersion = version.inheritsFrom ?? version.id;
+    final (minJava, maxJava) = JavaService.getRequiredJavaVersion(baseVersion);
+    final mainClass = versionJson['mainClass'] ?? '';
+    final isOldForge = mainClass.contains('launchwrapper') || 
+                       mainClass.contains('cpw.mods.fml') ||
+                       (version.id.contains('forge') && maxJava != null && maxJava <= 8);
+
     
     
-    if (javaPath.isEmpty && javaService != null && globalSettings.autoSelectJava) {
-      
-      final baseVersion = version.inheritsFrom ?? version.id;
-      final (minJava, maxJava) = JavaService.getRequiredJavaVersion(baseVersion);
-      
-      
-      final mainClass = versionJson['mainClass'] ?? '';
-      final isOldForge = mainClass.contains('launchwrapper') || 
-                         mainClass.contains('cpw.mods.fml') ||
-                         (version.id.contains('forge') && maxJava != null);
-      
+    String? profileJavaPath = profile?.javaPath;
+    
+    if (profileJavaPath != null && profileJavaPath.isEmpty) {
+      profileJavaPath = null;
+    }
+
+    String javaPath = profileJavaPath ?? globalSettings.javaPath ?? '';
+    int javaMajorVersion = 0; 
+
+    
+    if (profileJavaPath == null && javaService != null && globalSettings.autoSelectJava) {
       final selectedJava = javaService.selectJavaForVersion(
         minJava, 
         maxVersion: isOldForge ? 8 : maxJava,
@@ -370,12 +380,53 @@ class GameService extends ChangeNotifier {
       
       if (selectedJava != null) {
         javaPath = selectedJava.path;
-        debugPrint('[Launch] 自动选择 Java: ${selectedJava.majorVersion} (${selectedJava.vendor}) for $baseVersion');
+        javaMajorVersion = selectedJava.majorVersion;
+        debugPrint('[Launch] 自动选择 Java: ${javaMajorVersion} (${selectedJava.vendor}) for $baseVersion');
       }
     }
     
     if (javaPath.isEmpty) {
       javaPath = 'java';
+    }
+
+    String detectedVersionRaw = '';
+
+    
+    if (javaMajorVersion == 0) {
+       if (javaPath == 'java') {
+          try {
+             debugPrint('[Launch] 尝试检测系统 Java 版本...');
+             final result = await Process.run('java', ['-version'], runInShell: true);
+             final output = result.stderr.toString() + result.stdout.toString();
+             detectedVersionRaw = output.trim();
+             
+             final info = JavaInfo.parse(output, 'java');
+             if (info != null) {
+                javaMajorVersion = info.majorVersion;
+                debugPrint('[Launch] 检测到系统 Java 版本: $javaMajorVersion');
+             }
+          } catch (e) {
+             debugPrint('[Launch] 系统 Java 检测失败: $e');
+          }
+       } else if (await File(javaPath).exists()) {
+          final info = await JavaInfo.fromPath(javaPath);
+          if (info != null) {
+             javaMajorVersion = info.majorVersion;
+             detectedVersionRaw = 'Version: ${info.version}';
+             debugPrint('[Launch] 检测到 Java 版本: $javaMajorVersion ($javaPath)');
+          }
+       }
+    }
+    
+    
+    
+
+    
+    if (isOldForge && javaMajorVersion > 8) {
+       throw Exception('此版本 (Forge/Legacy) 需要 Java 8，但检测到 Java $javaMajorVersion ($javaPath)。\n'
+           '检测到的版本信息: \n$detectedVersionRaw\n\n'
+           'Minecraft 1.12.2 及以下版本的 Forge 不支持高版本 Java。\n'
+           '请安装 Java 8 并设置路径，或在设置中开启自动选择 Java (需确保已安装 Java 8)。');
     }
     
     
@@ -403,7 +454,7 @@ class GameService extends ChangeNotifier {
       throw Exception('找不到客户端 JAR: $clientJar');
     }
     
-    final classpathStr = [...classpath, clientJar].join(';');
+    final classpathStr = [...classpath, clientJar].join(Platform.isWindows ? ';' : ':');
 
     
     final runDir = getRunDirectory(version.id);
@@ -425,16 +476,104 @@ class GameService extends ChangeNotifier {
       '-Dminecraft.client.jar=$clientJar',
     ];
 
-    final extraJvmArgs = profile?.jvmArgs ?? globalSettings.jvmArgs;
-    if (extraJvmArgs.isNotEmpty) {
-      jvmArgs.addAll(extraJvmArgs.split(' ').where((s) => s.isNotEmpty));
+    
+    final assetIndex = versionJson['assetIndex']?['id'] ?? versionJson['assets'] ?? version.id;
+
+    
+    final argumentsJvm = versionJson['arguments']?['jvm'] as List?;
+    if (argumentsJvm != null) {
+      String replaceArg(String arg) {
+        return arg
+            .replaceAll('\${auth_player_name}', account.username)
+            .replaceAll('\${version_name}', version.id)
+            .replaceAll('\${game_directory}', runDir)
+            .replaceAll('\${assets_root}', _assetsDir)
+            .replaceAll('\${assets_index_name}', assetIndex)
+            .replaceAll('\${auth_uuid}', account.uuid)
+            .replaceAll('\${auth_access_token}', account.accessToken)
+            .replaceAll('\${user_properties}', '{}')
+            .replaceAll('\${user_type}', account.type == AccountType.microsoft ? 'msa' : 'legacy')
+            .replaceAll('\${version_type}', version.type)
+            .replaceAll('\${natives_directory}', nativesDir)
+            .replaceAll('\${launcher_name}', 'Oblivion')
+            .replaceAll('\${launcher_version}', '1.0.0')
+            .replaceAll('\${classpath}', classpathStr);
+      }
+
+      for (final arg in argumentsJvm) {
+        if (arg is String) {
+          jvmArgs.add(replaceArg(arg));
+        } else if (arg is Map) {
+          final rules = arg['rules'] as List?;
+          bool allowed = true;
+          if (rules != null) {
+             allowed = false;
+             for (final rule in rules) {
+               final action = rule['action'];
+               final os = rule['os'];
+               if (os == null) {
+                 if (action == 'allow') allowed = true;
+               } else {
+                 final osName = os['name'];
+                 if (Platform.isWindows && osName == 'windows') {
+                   if (action == 'allow') allowed = true;
+                 } else if (Platform.isMacOS && (osName == 'osx' || osName == 'macos')) {
+                   if (action == 'allow') allowed = true;
+                 } else if (Platform.isLinux && osName == 'linux') {
+                   if (action == 'allow') allowed = true;
+                 }
+               }
+             }
+          }
+          
+          if (allowed) {
+            final val = arg['value'];
+            if (val is String) {
+              jvmArgs.add(replaceArg(val));
+            } else if (val is List) {
+              for (final v in val) {
+                jvmArgs.add(replaceArg(v.toString()));
+              }
+            }
+          }
+        }
+      }
     }
 
     
-    final mainClass = versionJson['mainClass'] ?? 'net.minecraft.client.main.Main';
+    
+    if (javaMajorVersion >= 9 && (version.id.contains('forge') || mainClass.toString().contains('cpw.mods.bootstraplauncher'))) {
+        final requiredOpens = [
+          '--add-opens', 'java.base/java.util.jar=ALL-UNNAMED',
+          '--add-opens', 'java.base/java.lang.invoke=ALL-UNNAMED',
+          '--add-opens', 'java.base/java.lang.reflect=ALL-UNNAMED',
+          '--add-opens', 'java.base/java.io=ALL-UNNAMED',
+          '--add-opens', 'java.base/java.nio=ALL-UNNAMED',
+          '--add-opens', 'java.base/java.util=ALL-UNNAMED',
+          '--add-opens', 'java.base/sun.security.util=ALL-UNNAMED',
+         ];
+
+        for (int i = 0; i < requiredOpens.length; i += 2) {
+            final key = requiredOpens[i];
+            final value = requiredOpens[i+1];
+            bool exists = false;
+            for (int j = 0; j < jvmArgs.length - 1; j++) {
+                if (jvmArgs[j] == key && jvmArgs[j+1] == value) {
+                    exists = true;
+                    break;
+                }
+            }
+            if (!exists) {
+                jvmArgs.add(key);
+                jvmArgs.add(value);
+            }
+        }
+    }
+
+    final extraJvmArgs = profile?.jvmArgs ?? globalSettings.jvmArgs;
     
     
-    final assetIndex = versionJson['assetIndex']?['id'] ?? versionJson['assets'] ?? version.id;
+    
     final windowWidth = profile?.windowWidth ?? globalSettings.windowWidth;
     final windowHeight = profile?.windowHeight ?? globalSettings.windowHeight;
     final fullscreen = profile?.fullscreen ?? globalSettings.fullscreen;
@@ -578,6 +717,13 @@ class GameService extends ChangeNotifier {
       await saveVersionProfile(profile);
     }
 
+    _analyticsService?.trackEvent('Launch Game', data: {
+      'version': version.id,
+      'type': version.type,
+      'java_path': javaPath,
+      'memory_max': maxMemory,
+    });
+
     onStatusChange?.call('游戏已启动');
   }
 
@@ -601,6 +747,7 @@ class GameService extends ChangeNotifier {
     
     if (!await jsonFile.exists()) {
       onStatus?.call('版本文件不存在');
+      debugPrint('[VerifyFiles] 版本文件不存在: $jsonFile');
       return false;
     }
 
@@ -613,43 +760,62 @@ class GameService extends ChangeNotifier {
     final clientJarPath = p.join(_versionsDir, jarVersion, '$jarVersion.jar');
     final clientJar = File(clientJarPath);
     
+    debugPrint('[VerifyFiles] 检查客户端 JAR: $clientJarPath');
+    debugPrint('[VerifyFiles] inheritsFrom=$inheritsFrom, jar=${versionJson['jar']}, jarVersion=$jarVersion');
+    
     if (!await clientJar.exists()) {
+      debugPrint('[VerifyFiles] 客户端 JAR 不存在，尝试查找下载信息');
       
       Map<String, dynamic> baseJson = versionJson;
       if (inheritsFrom != null) {
         final baseJsonFile = File(p.join(_versionsDir, inheritsFrom, '$inheritsFrom.json'));
         if (await baseJsonFile.exists()) {
           baseJson = jsonDecode(await baseJsonFile.readAsString()) as Map<String, dynamic>;
+          debugPrint('[VerifyFiles] 从继承版本读取下载信息: $inheritsFrom');
+        } else {
+          debugPrint('[VerifyFiles] 警告：继承版本文件不存在: $baseJsonFile');
         }
       }
       
       final downloads = baseJson['downloads'];
       if (downloads?['client'] != null) {
-        missingFiles.add(DownloadFile(
-          url: _getMirrorUrl(downloads['client']['url']),
+        missingFiles.add(_createDownloadFile(
+          url: downloads['client']['url'],
           path: clientJarPath,
           sha1: downloads['client']['sha1'],
           size: downloads['client']['size'],
         ));
+        debugPrint('[VerifyFiles] 添加客户端 JAR 到下载列表');
+      } else {
+        debugPrint('[VerifyFiles] 错误：无法找到客户端下载信息');
+        onStatus?.call('错误：找不到客户端 JAR 文件');
+        return false;
       }
+    } else {
+      debugPrint('[VerifyFiles] 客户端 JAR 存在');
     }
 
     
     onStatus?.call('正在检查库文件...');
+    int checkedLibs = 0;
+    int missingLibs = 0;
+    
     for (final lib in versionJson['libraries'] ?? []) {
       if (!_shouldIncludeLibrary(lib)) continue;
+      checkedLibs++;
       
       final downloads = lib['downloads'];
       if (downloads?['artifact'] != null) {
         final artifact = downloads['artifact'];
         final libPath = p.join(_librariesDir, artifact['path']);
         if (!await File(libPath).exists()) {
-          missingFiles.add(DownloadFile(
-            url: _getMirrorUrl(artifact['url']),
+          missingFiles.add(_createDownloadFile(
+            url: artifact['url'],
             path: libPath,
             sha1: artifact['sha1'],
             size: artifact['size'],
           ));
+          missingLibs++;
         }
       } else if (lib['natives'] == null) {
         
@@ -674,11 +840,13 @@ class GameService extends ChangeNotifier {
                   baseUrl = 'https://repo1.maven.org/maven2/';
                 }
               }
-              final url = baseUrl.endsWith('/') ? '$baseUrl$libPath' : '$baseUrl/$libPath';
-              missingFiles.add(DownloadFile(
-                url: _getMirrorUrl(url),
+              final fullUrl = baseUrl.endsWith('/') ? '$baseUrl$libPath' : '$baseUrl/$libPath';
+              
+              missingFiles.add(_createDownloadFile(
+                url: fullUrl,
                 path: fullPath,
               ));
+              missingLibs++;
             }
           }
         }
@@ -686,9 +854,19 @@ class GameService extends ChangeNotifier {
 
       
       final natives = lib['natives'];
-      if (natives?['windows'] != null) {
+      String? nativeKey;
+      if (natives != null) {
+        if (Platform.isWindows) {
+          nativeKey = natives['windows'];
+        } else if (Platform.isMacOS) {
+          nativeKey = natives['osx'] ?? natives['macos'];
+        } else if (Platform.isLinux) {
+          nativeKey = natives['linux'];
+        }
+      }
+      
+      if (nativeKey != null) {
         
-        String nativeKey = natives['windows'] as String;
         nativeKey = nativeKey.replaceAll('\${arch}', '64'); 
         
         final classifiers = downloads?['classifiers'];
@@ -696,30 +874,98 @@ class GameService extends ChangeNotifier {
         if (nativeInfo != null) {
           final nativePath = p.join(_librariesDir, nativeInfo['path']);
           if (!await File(nativePath).exists()) {
-            missingFiles.add(DownloadFile(
-              url: _getMirrorUrl(nativeInfo['url']),
+            missingFiles.add(_createDownloadFile(
+              url: nativeInfo['url'],
               path: nativePath,
               sha1: nativeInfo['sha1'],
               size: nativeInfo['size'],
             ));
+            missingLibs++;
+          }
+        } else {
+          
+          final name = lib['name'] as String?;
+          if (name != null) {
+             final parts = name.split(':');
+             if (parts.length >= 3) {
+                final group = parts[0].replaceAll('.', '/');
+                final artifact = parts[1];
+                final version = parts[2];
+                final classifier = nativeKey;
+                
+                final relativePath = '$group/$artifact/$version/$artifact-$version-$classifier.jar';
+                final libPath = p.join(_librariesDir, relativePath);
+                
+                if (!await File(libPath).exists()) {
+                   String baseUrl = lib['url'] as String? ?? '';
+                   if (baseUrl.isEmpty) {
+                      if (name.startsWith('net.minecraftforge:')) {
+                        baseUrl = 'https://maven.minecraftforge.net/';
+                      } else if (name.startsWith('net.minecraft:')) {
+                        baseUrl = 'https://libraries.minecraft.net/';
+                      } else {
+                        baseUrl = 'https://repo1.maven.org/maven2/';
+                      }
+                   }
+                   final fullUrl = baseUrl.endsWith('/') ? '$baseUrl$relativePath' : '$baseUrl/$relativePath';
+                   
+                   final bmclapiUrl = fullUrl
+                       .replaceFirst('https://libraries.minecraft.net', 'https://bmclapi2.bangbang93.com/maven')
+                       .replaceFirst('https://resources.download.minecraft.net', 'https://bmclapi2.bangbang93.com/assets')
+                       .replaceFirst('https://piston-meta.mojang.com', 'https://bmclapi2.bangbang93.com')
+                       .replaceFirst('https://piston-data.mojang.com', 'https://bmclapi2.bangbang93.com')
+                       .replaceFirst('https://launchermeta.mojang.com', 'https://bmclapi2.bangbang93.com')
+                       .replaceFirst('https://maven.minecraftforge.net/', 'https://bmclapi2.bangbang93.com/maven/')
+                       .replaceFirst('https://maven.minecraftforge.net', 'https://bmclapi2.bangbang93.com/maven')
+                       .replaceFirst('https://repo1.maven.org/maven2/', 'https://bmclapi2.bangbang93.com/maven/')
+                       .replaceFirst('https://repo1.maven.org/maven2', 'https://bmclapi2.bangbang93.com/maven');
+
+                   String primaryUrl;
+                   List<String> fallbackUrls;
+
+                   if (_configService.settings.downloadSource == DownloadSource.bmclapi) {
+                     primaryUrl = bmclapiUrl;
+                     fallbackUrls = [fullUrl];
+                   } else {
+                     primaryUrl = fullUrl;
+                     fallbackUrls = [bmclapiUrl];
+                   }
+
+                   missingFiles.add(DownloadFile(
+                     url: primaryUrl,
+                     path: libPath,
+                     fallbackUrls: fallbackUrls,
+                   ));
+                   missingLibs++;
+                   debugPrint('[VerifyFiles] 添加缺失库 (natives-maven): $name -> $relativePath');
+                }
+             }
           }
         }
       }
     }
 
+    debugPrint('[VerifyFiles] 检查完成：共 $checkedLibs 个库，缺失 $missingLibs 个');
+
     if (missingFiles.isEmpty) {
       onStatus?.call('文件完整');
+      debugPrint('[VerifyFiles] 所有文件完整');
       return true;
     }
 
     onStatus?.call('正在下载 ${missingFiles.length} 个文件...');
-    return await _downloadService.downloadFilesInBackground(
+    debugPrint('[VerifyFiles] 开始下载 ${missingFiles.length} 个缺失文件');
+    
+    final result = await _downloadService.downloadFilesInBackground(
       '补全文件: $versionId',
       missingFiles,
       _configService.settings.concurrentDownloads,
       onProgress: onProgress,
       onStatus: onStatus,
     );
+    
+    debugPrint('[VerifyFiles] 下载结果: $result');
+    return result;
   }
 
   Future<Map<String, dynamic>> _resolveVersion(String versionId) async {
@@ -737,7 +983,30 @@ class GameService extends ChangeNotifier {
     merged['libraries'] = [...parentLibs, ...childLibs];
     
     for (final key in json.keys) {
-      if (key != 'libraries') {
+      if (key == 'libraries') continue;
+
+      if (key == 'arguments') {
+        final parentArgs = merged['arguments'] as Map<String, dynamic>? ?? {};
+        final childArgs = json['arguments'] as Map<String, dynamic>;
+        
+        final mergedArgs = Map<String, dynamic>.from(parentArgs);
+        
+        
+        if (childArgs['game'] != null) {
+          final parentGame = List<dynamic>.from(mergedArgs['game'] ?? []);
+          final childGame = List<dynamic>.from(childArgs['game']);
+          mergedArgs['game'] = [...parentGame, ...childGame];
+        }
+        
+        
+        if (childArgs['jvm'] != null) {
+          final parentJvm = List<dynamic>.from(mergedArgs['jvm'] ?? []);
+          final childJvm = List<dynamic>.from(childArgs['jvm']);
+          mergedArgs['jvm'] = [...parentJvm, ...childJvm];
+        }
+        
+        merged['arguments'] = mergedArgs;
+      } else {
         merged[key] = json[key];
       }
     }
@@ -793,10 +1062,15 @@ class GameService extends ChangeNotifier {
 
       if (os == null) {
         allowed = action == 'allow';
-      } else if (os['name'] == 'windows') {
-        allowed = action == 'allow';
-      } else if (os['name'] != 'windows' && action == 'allow') {
-        allowed = false;
+      } else {
+        final osName = os['name'];
+        if (Platform.isWindows && osName == 'windows') {
+          allowed = action == 'allow';
+        } else if (Platform.isMacOS && (osName == 'osx' || osName == 'macos')) {
+          allowed = action == 'allow';
+        } else if (Platform.isLinux && osName == 'linux') {
+          allowed = action == 'allow';
+        }
       }
     }
     return allowed;
@@ -812,7 +1086,14 @@ class GameService extends ChangeNotifier {
       final natives = lib['natives'];
       if (natives == null) continue;
       
-      String? nativeKey = natives['windows'] as String?;
+      String? nativeKey;
+      if (Platform.isWindows) {
+        nativeKey = natives['windows'];
+      } else if (Platform.isMacOS) {
+        nativeKey = natives['osx'] ?? natives['macos'];
+      } else if (Platform.isLinux) {
+        nativeKey = natives['linux'];
+      }
       if (nativeKey == null) continue;
       
       
@@ -847,18 +1128,49 @@ class GameService extends ChangeNotifier {
     }
   }
 
+  String _toBmclapiUrl(String url) {
+    return url
+        .replaceFirst('https://libraries.minecraft.net', 'https://bmclapi2.bangbang93.com/maven')
+        .replaceFirst('https://resources.download.minecraft.net', 'https://bmclapi2.bangbang93.com/assets')
+        .replaceFirst('https://piston-meta.mojang.com', 'https://bmclapi2.bangbang93.com')
+        .replaceFirst('https://piston-data.mojang.com', 'https://bmclapi2.bangbang93.com')
+        .replaceFirst('https://launchermeta.mojang.com', 'https://bmclapi2.bangbang93.com')
+        .replaceFirst('https://maven.minecraftforge.net/', 'https://bmclapi2.bangbang93.com/maven/')
+        .replaceFirst('https://maven.minecraftforge.net', 'https://bmclapi2.bangbang93.com/maven')
+        .replaceFirst('https://repo1.maven.org/maven2/', 'https://bmclapi2.bangbang93.com/maven/')
+        .replaceFirst('https://repo1.maven.org/maven2', 'https://bmclapi2.bangbang93.com/maven');
+  }
+
+  DownloadFile _createDownloadFile({
+    required String url,
+    required String path,
+    String? sha1,
+    int? size,
+  }) {
+    final bmclapiUrl = _toBmclapiUrl(url);
+    String primaryUrl;
+    List<String> fallbackUrls;
+
+    if (_configService.settings.downloadSource == DownloadSource.bmclapi) {
+      primaryUrl = bmclapiUrl;
+      fallbackUrls = [url];
+    } else {
+      primaryUrl = url;
+      fallbackUrls = [bmclapiUrl];
+    }
+
+    return DownloadFile(
+      url: primaryUrl,
+      path: path,
+      fallbackUrls: fallbackUrls,
+      sha1: sha1,
+      size: size,
+    );
+  }
+
   String _getMirrorUrl(String url) {
     if (_configService.settings.downloadSource == DownloadSource.bmclapi) {
-      return url
-          .replaceFirst('https://libraries.minecraft.net', 'https://bmclapi2.bangbang93.com/maven')
-          .replaceFirst('https://resources.download.minecraft.net', 'https://bmclapi2.bangbang93.com/assets')
-          .replaceFirst('https://piston-meta.mojang.com', 'https://bmclapi2.bangbang93.com')
-          .replaceFirst('https://piston-data.mojang.com', 'https://bmclapi2.bangbang93.com')
-          .replaceFirst('https://launchermeta.mojang.com', 'https://bmclapi2.bangbang93.com')
-          .replaceFirst('https://maven.minecraftforge.net/', 'https://bmclapi2.bangbang93.com/maven/')
-          .replaceFirst('https://maven.minecraftforge.net', 'https://bmclapi2.bangbang93.com/maven')
-          .replaceFirst('https://repo1.maven.org/maven2/', 'https://bmclapi2.bangbang93.com/maven/')
-          .replaceFirst('https://repo1.maven.org/maven2', 'https://bmclapi2.bangbang93.com/maven');
+      return _toBmclapiUrl(url);
     }
     return url;
   }
@@ -897,8 +1209,8 @@ class GameService extends ChangeNotifier {
     
     final clientDownload = versionJson['downloads']?['client'];
     if (clientDownload != null) {
-      files.add(DownloadFile(
-        url: _getMirrorUrl(clientDownload['url']),
+      files.add(_createDownloadFile(
+        url: clientDownload['url'],
         path: p.join(vanillaVersionDir, '$vanillaVersionId.jar'),
         sha1: clientDownload['sha1'],
         size: clientDownload['size'],
@@ -913,8 +1225,8 @@ class GameService extends ChangeNotifier {
       final downloads = lib['downloads'];
       if (downloads?['artifact'] != null) {
         final artifact = downloads['artifact'];
-        files.add(DownloadFile(
-          url: _getMirrorUrl(artifact['url']),
+        files.add(_createDownloadFile(
+          url: artifact['url'],
           path: p.join(_librariesDir, artifact['path']),
           sha1: artifact['sha1'],
           size: artifact['size'],
@@ -922,14 +1234,24 @@ class GameService extends ChangeNotifier {
       }
 
       final natives = lib['natives'];
-      if (natives?['windows'] != null) {
-        String nativeKey = natives['windows'] as String;
+      String? nativeKey;
+      if (natives != null) {
+        if (Platform.isWindows) {
+          nativeKey = natives['windows'];
+        } else if (Platform.isMacOS) {
+          nativeKey = natives['osx'] ?? natives['macos'];
+        } else if (Platform.isLinux) {
+          nativeKey = natives['linux'];
+        }
+      }
+
+      if (nativeKey != null) {
         nativeKey = nativeKey.replaceAll('\${arch}', '64');
         final classifiers = downloads?['classifiers'];
         final nativeInfo = classifiers?[nativeKey];
         if (nativeInfo != null) {
-          files.add(DownloadFile(
-            url: _getMirrorUrl(nativeInfo['url']),
+          files.add(_createDownloadFile(
+            url: nativeInfo['url'],
             path: p.join(_librariesDir, nativeInfo['path']),
             sha1: nativeInfo['sha1'],
             size: nativeInfo['size'],
@@ -941,8 +1263,8 @@ class GameService extends ChangeNotifier {
     
     final assetIndex = versionJson['assetIndex'];
     if (assetIndex != null) {
-      files.add(DownloadFile(
-        url: _getMirrorUrl(assetIndex['url']),
+      files.add(_createDownloadFile(
+        url: assetIndex['url'],
         path: p.join(_assetsDir, 'indexes', '${assetIndex['id']}.json'),
         sha1: assetIndex['sha1'],
         size: assetIndex['size'],
@@ -1142,10 +1464,28 @@ class GameService extends ChangeNotifier {
     
     final vanillaJar = p.join(_versionsDir, vanillaVersionId, '$vanillaVersionId.jar');
     final outputJar = p.join(versionDir, '$finalVersionId.jar');
-    if (vanillaJar != outputJar && await File(vanillaJar).exists()) {
-      onStatus?.call('正在复制游戏文件...');
-      await File(vanillaJar).copy(outputJar);
-      debugPrint('[MergeJson] 已复制原版 JAR: $vanillaJar -> $outputJar');
+    
+    debugPrint('[MergeJson] 检查 JAR 文件：');
+    debugPrint('[MergeJson]   原版 JAR: $vanillaJar');
+    debugPrint('[MergeJson]   输出 JAR: $outputJar');
+    debugPrint('[MergeJson]   原版 JAR 存在: ${await File(vanillaJar).exists()}');
+    debugPrint('[MergeJson]   输出 JAR 存在: ${await File(outputJar).exists()}');
+    
+    if (vanillaJar != outputJar) {
+      if (await File(vanillaJar).exists()) {
+        if (!await File(outputJar).exists()) {
+          onStatus?.call('正在复制游戏文件...');
+          await File(vanillaJar).copy(outputJar);
+          debugPrint('[MergeJson] 已复制原版 JAR: $vanillaJar -> $outputJar');
+        } else {
+          debugPrint('[MergeJson] 输出 JAR 已存在，跳过复制');
+        }
+      } else {
+        debugPrint('[MergeJson] 错误：原版 JAR 不存在！');
+        throw Exception('原版 JAR 文件不存在: $vanillaJar');
+      }
+    } else {
+      debugPrint('[MergeJson] 原版 JAR 和输出 JAR 路径相同，无需复制');
     }
   }
   
@@ -1374,8 +1714,8 @@ class GameService extends ChangeNotifier {
       final assetPath = p.join(_assetsDir, 'objects', prefix, hash);
       
       if (!await File(assetPath).exists()) {
-        files.add(DownloadFile(
-          url: _getMirrorUrl('https://resources.download.minecraft.net/$prefix/$hash'),
+        files.add(_createDownloadFile(
+          url: 'https://resources.download.minecraft.net/$prefix/$hash',
           path: assetPath,
           sha1: hash,
           size: entry.value['size'],
@@ -1522,29 +1862,59 @@ class GameService extends ChangeNotifier {
     return newVersionId;
   }
 
-  Future<String> _installForge(String gameVersion, String forgeVersion, {
+
+
+  Future<String> _installQuilt(String gameVersion, String loaderVersion, {
     String? customName,
     void Function(String)? onStatus,
   }) async {
-    final result = await _installForgeAndGetJson(gameVersion, forgeVersion, onStatus: onStatus);
-    final newVersionId = customName ?? result.defaultId;
+    onStatus?.call('正在安装 Quilt $loaderVersion...');
+    
+    final response = await http.get(Uri.parse(
+      'https://meta.quiltmc.org/v3/versions/loader/$gameVersion/$loaderVersion/profile/json'
+    ));
+    
+    if (response.statusCode != 200) throw Exception('获取 Quilt 配置失败');
+    
+    final quiltJson = jsonDecode(response.body) as Map<String, dynamic>;
+    final defaultId = '$gameVersion-quilt-$loaderVersion';
+    final newVersionId = customName ?? defaultId;
     final versionDir = p.join(_versionsDir, newVersionId);
     
     await Directory(versionDir).create(recursive: true);
     
-    final forgeJson = result.json;
-    forgeJson['id'] = newVersionId;
-    forgeJson['inheritsFrom'] = gameVersion;
+    quiltJson['id'] = newVersionId;
+    quiltJson['inheritsFrom'] = gameVersion;
     
-    await File(p.join(versionDir, '$newVersionId.json')).writeAsString(jsonEncode(forgeJson));
+    await File(p.join(versionDir, '$newVersionId.json')).writeAsString(jsonEncode(quiltJson));
+
+    
+    final files = <DownloadFile>[];
+    for (final lib in quiltJson['libraries'] ?? []) {
+      final name = lib['name'] as String;
+      final url = lib['url'] as String? ?? 'https://maven.quiltmc.org/repository/release/';
+      final path = _mavenNameToPath(name);
+      if (path != null) {
+        final fullUrl = url.endsWith('/') ? '$url$path' : '$url/$path';
+        files.add(DownloadFile(url: fullUrl, path: p.join(_librariesDir, path)));
+      }
+    }
+
+    if (files.isNotEmpty) {
+      onStatus?.call('正在下载 Quilt 库文件...');
+      await _downloadService.downloadFilesInBackground(
+        'Quilt 库文件',
+        files, _configService.settings.concurrentDownloads,
+      );
+    }
+
     return newVersionId;
   }
 
-  
   Future<_ForgeInstallResult> _installForgeAndGetJson(String gameVersion, String forgeVersion, {
     void Function(String)? onStatus,
   }) async {
-    onStatus?.call('正在安装 Forge $forgeVersion...');
+    onStatus?.call('正在准备 Forge $forgeVersion...');
     debugPrint('[Forge] 开始安装 Forge: gameVersion=$gameVersion, forgeVersion=$forgeVersion');
     
     
@@ -1602,6 +1972,7 @@ class GameService extends ChangeNotifier {
     final fileSize = await installerFile.length();
     debugPrint('[Forge] 安装器大小: $fileSize bytes');
 
+    
     onStatus?.call('正在解析 Forge 安装器...');
     final bytes = await installerFile.readAsBytes();
     
@@ -1614,33 +1985,21 @@ class GameService extends ChangeNotifier {
       throw Exception('Forge 安装器解压失败: $e');
     }
     
-    
-    for (final file in archive) {
-      if (file.name.contains('version') || file.name.contains('install')) {
-        debugPrint('[Forge] ZIP 文件: ${file.name}');
-      }
-    }
-    
-    
     var versionEntry = archive.findFile('version.json');
     Map<String, dynamic> forgeJson;
     
     if (versionEntry == null) {
-      
       versionEntry = archive.findFile('install_profile.json');
       if (versionEntry != null) {
         debugPrint('[Forge] 找到 install_profile.json，这是旧版 Forge 格式');
-        
         final installProfile = jsonDecode(utf8.decode(versionEntry.content as List<int>)) as Map<String, dynamic>;
-        
         
         if (installProfile.containsKey('versionInfo')) {
           forgeJson = installProfile['versionInfo'] as Map<String, dynamic>;
         } else {
-          
           versionEntry = archive.findFile('version.json');
           if (versionEntry == null) {
-            throw Exception('无效的 Forge 安装器：未找到 version.json');
+             throw Exception('无效的 Forge 安装器：未找到 version.json');
           }
           forgeJson = jsonDecode(utf8.decode(versionEntry.content as List<int>)) as Map<String, dynamic>;
         }
@@ -1665,40 +2024,58 @@ class GameService extends ChangeNotifier {
         final url = artifact['url'] as String?;
         final artifactPath = artifact['path'] as String?;
         if (url != null && url.isNotEmpty && artifactPath != null) {
-          files.add(DownloadFile(
-            url: _getMirrorUrl(url),
-            path: p.join(_librariesDir, artifactPath),
-            sha1: artifact['sha1'],
-          ));
-          debugPrint('[Forge] 添加库 (artifact): $artifactPath');
+           files.add(DownloadFile(
+             url: _getMirrorUrl(url),
+             path: p.join(_librariesDir, artifactPath),
+             sha1: artifact['sha1'],
+           ));
         }
       } else {
-        
         final name = lib['name'] as String?;
         if (name != null) {
           final libPath = _mavenNameToPath(name);
           if (libPath != null) {
-            
-            String baseUrl = lib['url'] as String? ?? '';
-            if (baseUrl.isEmpty) {
-              
-              if (name.startsWith('net.minecraftforge:')) {
-                baseUrl = 'https://maven.minecraftforge.net/';
-              } else if (name.startsWith('net.minecraft:')) {
-                baseUrl = 'https://libraries.minecraft.net/';
-              } else if (name.startsWith('org.ow2.asm:') || name.startsWith('cpw.mods:')) {
-                baseUrl = 'https://maven.minecraftforge.net/';
-              } else {
-                baseUrl = 'https://repo1.maven.org/maven2/';
-              }
-            }
-            
-            final fullUrl = baseUrl.endsWith('/') ? '$baseUrl$libPath' : '$baseUrl/$libPath';
-            files.add(DownloadFile(
-              url: _getMirrorUrl(fullUrl),
-              path: p.join(_librariesDir, libPath),
-            ));
-            debugPrint('[Forge] 添加库 (name): $name -> $libPath');
+             String baseUrl = lib['url'] as String? ?? '';
+             if (baseUrl.isEmpty) {
+               if (name.startsWith('net.minecraftforge:')) {
+                 baseUrl = 'https://maven.minecraftforge.net/';
+               } else if (name.startsWith('net.minecraft:')) {
+                 baseUrl = 'https://libraries.minecraft.net/';
+               } else if (name.startsWith('org.ow2.asm:') || name.startsWith('cpw.mods:')) {
+                 baseUrl = 'https://maven.minecraftforge.net/';
+               } else {
+                 baseUrl = 'https://repo1.maven.org/maven2/';
+               }
+             }
+             final fullUrl = baseUrl.endsWith('/') ? '$baseUrl$libPath' : '$baseUrl/$libPath';
+             
+             final bmclapiUrl = fullUrl
+                 .replaceFirst('https://libraries.minecraft.net', 'https://bmclapi2.bangbang93.com/maven')
+                 .replaceFirst('https://resources.download.minecraft.net', 'https://bmclapi2.bangbang93.com/assets')
+                 .replaceFirst('https://piston-meta.mojang.com', 'https://bmclapi2.bangbang93.com')
+                 .replaceFirst('https://piston-data.mojang.com', 'https://bmclapi2.bangbang93.com')
+                 .replaceFirst('https://launchermeta.mojang.com', 'https://bmclapi2.bangbang93.com')
+                 .replaceFirst('https://maven.minecraftforge.net/', 'https://bmclapi2.bangbang93.com/maven/')
+                 .replaceFirst('https://maven.minecraftforge.net', 'https://bmclapi2.bangbang93.com/maven')
+                 .replaceFirst('https://repo1.maven.org/maven2/', 'https://bmclapi2.bangbang93.com/maven/')
+                 .replaceFirst('https://repo1.maven.org/maven2', 'https://bmclapi2.bangbang93.com/maven');
+
+             String primaryUrl;
+             List<String> fallbackUrls;
+
+             if (_configService.settings.downloadSource == DownloadSource.bmclapi) {
+               primaryUrl = bmclapiUrl;
+               fallbackUrls = [fullUrl];
+             } else {
+               primaryUrl = fullUrl;
+               fallbackUrls = [bmclapiUrl];
+             }
+
+             files.add(DownloadFile(
+               url: primaryUrl,
+               path: p.join(_librariesDir, libPath),
+               fallbackUrls: fallbackUrls,
+             ));
           }
         }
       }
@@ -1706,7 +2083,6 @@ class GameService extends ChangeNotifier {
 
     if (files.isNotEmpty) {
       onStatus?.call('正在下载 ${files.length} 个 Forge 库文件...');
-      debugPrint('[Forge] 开始下载 ${files.length} 个库文件');
       await _downloadService.downloadFilesInBackground(
         'Forge 库文件',
         files, _configService.settings.concurrentDownloads,
@@ -1718,115 +2094,8 @@ class GameService extends ChangeNotifier {
     return _ForgeInstallResult(forgeJson, defaultId);
   }
 
-  
-  Future<String> _installForgeFromVersionInfo(
-    Map<String, dynamic> versionInfo,
-    String gameVersion,
-    String newVersionId,
-    Directory tempDir,
-    void Function(String)? onStatus,
-  ) async {
-    debugPrint('[Forge] 使用旧版格式安装');
-    final versionDir = p.join(_versionsDir, newVersionId);
-    await Directory(versionDir).create(recursive: true);
-    
-    versionInfo['id'] = newVersionId;
-    versionInfo['inheritsFrom'] = gameVersion;
-    
-    await File(p.join(versionDir, '$newVersionId.json')).writeAsString(jsonEncode(versionInfo));
-    
-    
-    final files = <DownloadFile>[];
-    for (final lib in versionInfo['libraries'] ?? []) {
-      final name = lib['name'] as String?;
-      if (name != null) {
-        final libPath = _mavenNameToPath(name);
-        if (libPath != null) {
-          
-          String baseUrl = lib['url'] as String? ?? '';
-          if (baseUrl.isEmpty) {
-            if (name.startsWith('net.minecraftforge:')) {
-              baseUrl = 'https://maven.minecraftforge.net/';
-            } else if (name.startsWith('net.minecraft:')) {
-              baseUrl = 'https://libraries.minecraft.net/';
-            } else if (name.startsWith('org.ow2.asm:') || name.startsWith('cpw.mods:')) {
-              baseUrl = 'https://maven.minecraftforge.net/';
-            } else {
-              baseUrl = 'https://repo1.maven.org/maven2/';
-            }
-          }
-          
-          final fullUrl = baseUrl.endsWith('/') ? '$baseUrl$libPath' : '$baseUrl/$libPath';
-          files.add(DownloadFile(
-            url: _getMirrorUrl(fullUrl),
-            path: p.join(_librariesDir, libPath),
-          ));
-          debugPrint('[Forge Old] 添加库: $name -> $libPath');
-        }
-      }
-    }
-    
-    if (files.isNotEmpty) {
-      onStatus?.call('正在下载 ${files.length} 个 Forge 库文件...');
-      await _downloadService.downloadFilesInBackground(
-        'Forge 库文件 (旧版)',
-        files, _configService.settings.concurrentDownloads,
-      );
-    }
-    
-    await tempDir.delete(recursive: true);
-    return newVersionId;
-  }
 
-  Future<String> _installQuilt(String gameVersion, String loaderVersion, {
-    String? customName,
-    void Function(String)? onStatus,
-  }) async {
-    onStatus?.call('正在安装 Quilt $loaderVersion...');
-    
-    final response = await http.get(Uri.parse(
-      'https://meta.quiltmc.org/v3/versions/loader/$gameVersion/$loaderVersion/profile/json'
-    ));
-    
-    if (response.statusCode != 200) throw Exception('获取 Quilt 配置失败');
-    
-    final quiltJson = jsonDecode(response.body) as Map<String, dynamic>;
-    final defaultId = '$gameVersion-quilt-$loaderVersion';
-    final newVersionId = customName ?? defaultId;
-    final versionDir = p.join(_versionsDir, newVersionId);
-    
-    await Directory(versionDir).create(recursive: true);
-    
-    quiltJson['id'] = newVersionId;
-    quiltJson['inheritsFrom'] = gameVersion;
-    
-    await File(p.join(versionDir, '$newVersionId.json')).writeAsString(jsonEncode(quiltJson));
 
-    
-    final files = <DownloadFile>[];
-    for (final lib in quiltJson['libraries'] ?? []) {
-      final name = lib['name'] as String;
-      final url = lib['url'] as String? ?? 'https://maven.quiltmc.org/repository/release/';
-      final path = _mavenNameToPath(name);
-      if (path != null) {
-        final fullUrl = url.endsWith('/') ? '$url$path' : '$url/$path';
-        files.add(DownloadFile(url: fullUrl, path: p.join(_librariesDir, path)));
-      }
-    }
-
-    if (files.isNotEmpty) {
-      onStatus?.call('正在下载 Quilt 库文件...');
-      await _downloadService.downloadFilesInBackground(
-        'Quilt 库文件',
-        files, _configService.settings.concurrentDownloads,
-      );
-    }
-
-    return newVersionId;
-  }
-
-  
-  
   Future<Map<String, dynamic>> _installOptiFineAndGetJson(String gameVersion, String optifineVersion, {
     void Function(String)? onStatus,
   }) async {
@@ -2242,8 +2511,15 @@ class DownloadFile {
   final String path;
   final String? sha1;
   final int? size;
+  final List<String> fallbackUrls;
 
-  DownloadFile({required this.url, required this.path, this.sha1, this.size});
+  DownloadFile({
+    required this.url,
+    required this.path,
+    this.sha1,
+    this.size,
+    this.fallbackUrls = const [],
+  });
 }
 
 class _ForgeInstallResult {

@@ -1,4 +1,4 @@
-﻿import 'dart:io';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -167,9 +167,10 @@ class JavaService extends ChangeNotifier {
 
   Future<void> _scanPathEnvironment(Set<String> paths) async {
     final pathEnv = Platform.environment['PATH'] ?? '';
-    for (final dir in pathEnv.split(';')) {
+    final separator = Platform.isWindows ? ';' : ':';
+    for (final dir in pathEnv.split(separator)) {
       if (dir.isEmpty) continue;
-      final javaExe = p.join(dir, 'java.exe');
+      final javaExe = p.join(dir, Platform.isWindows ? 'java.exe' : 'java');
       if (await File(javaExe).exists()) {
         paths.add(javaExe);
       }
@@ -179,7 +180,7 @@ class JavaService extends ChangeNotifier {
   Future<void> _scanJavaHome(Set<String> paths) async {
     final javaHome = Platform.environment['JAVA_HOME'];
     if (javaHome != null && javaHome.isNotEmpty) {
-      final javaExe = p.join(javaHome, 'bin', 'java.exe');
+      final javaExe = p.join(javaHome, 'bin', Platform.isWindows ? 'java.exe' : 'java');
       if (await File(javaExe).exists()) {
         paths.add(javaExe);
       }
@@ -187,39 +188,69 @@ class JavaService extends ChangeNotifier {
   }
 
   Future<void> _scanDefaultInstallPaths(Set<String> paths) async {
-    final localAppData = Platform.environment['LOCALAPPDATA'] ?? '';
-    final appData = Platform.environment['APPDATA'] ?? '';
-    final userProfile = Platform.environment['USERPROFILE'] ?? '';
-    
-    final searchPaths = <String>{
-      localAppData,
-      appData,
-      userProfile,
-    };
-
-    for (final drive in ['C', 'D']) {
-      searchPaths.add('$drive:\\Program Files');
-      searchPaths.add('$drive:\\Program Files (x86)');
-    }
-
-    for (final basePath in searchPaths) {
-      if (basePath.isEmpty || !await Directory(basePath).exists()) continue;
+    if (Platform.isWindows) {
+      final localAppData = Platform.environment['LOCALAPPDATA'] ?? '';
+      final appData = Platform.environment['APPDATA'] ?? '';
+      final userProfile = Platform.environment['USERPROFILE'] ?? '';
       
-      try {
-        await for (final entity in Directory(basePath).list()) {
-          if (entity is Directory) {
-            final dirName = p.basename(entity.path).toLowerCase();
-            if (_javaKeywords.any((k) => dirName.contains(k))) {
-              await _scanDirectoryForJava(entity.path, paths, maxDepth: 3);
+      final searchPaths = <String>{
+        localAppData,
+        appData,
+        userProfile,
+      };
+
+      for (final drive in ['C', 'D']) {
+        searchPaths.add('$drive:\\Program Files');
+        searchPaths.add('$drive:\\Program Files (x86)');
+      }
+
+      for (final basePath in searchPaths) {
+        if (basePath.isEmpty || !await Directory(basePath).exists()) continue;
+        
+        try {
+          await for (final entity in Directory(basePath).list()) {
+            if (entity is Directory) {
+              final dirName = p.basename(entity.path).toLowerCase();
+              if (_javaKeywords.any((k) => dirName.contains(k))) {
+                await _scanDirectoryForJava(entity.path, paths, maxDepth: 3);
+              }
             }
           }
+        } catch (e) {
+          
         }
-      } catch (e) {}
+      }
+    } else {
+      final searchPaths = <String>{};
+      if (Platform.isMacOS) {
+        searchPaths.add('/Library/Java/JavaVirtualMachines');
+        final home = Platform.environment['HOME'];
+        if (home != null) {
+          searchPaths.add('$home/Library/Java/JavaVirtualMachines');
+        }
+      } else if (Platform.isLinux) {
+        searchPaths.add('/usr/lib/jvm');
+        searchPaths.add('/usr/java');
+      }
+      
+      for (final path in searchPaths) {
+        await _scanDirectoryForJava(path, paths, maxDepth: 4);
+      }
+    }
+
+    final userHome = Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'];
+    String? mcPath;
+    if (Platform.isWindows) {
+      mcPath = p.join(Platform.environment['APPDATA'] ?? '', '.minecraft');
+    } else if (Platform.isMacOS) {
+      mcPath = p.join(userHome ?? '', 'Library', 'Application Support', 'minecraft');
+    } else {
+      mcPath = p.join(userHome ?? '', '.minecraft');
     }
 
     final specificPaths = [
-      p.join(appData, '.minecraft', 'runtime'),
-      p.join(userProfile, '.jdks'),
+      p.join(mcPath, 'runtime'),
+      if (userHome != null) p.join(userHome, '.jdks'),
     ];
     for (final path in specificPaths) {
       await _scanDirectoryForJava(path, paths, maxDepth: 4);
@@ -238,17 +269,25 @@ class JavaService extends ChangeNotifier {
 
   Future<void> _scanFromWhereCommand(Set<String> paths) async {
     try {
-      final result = await Process.run('where', ['java'], runInShell: true)
+      final cmd = Platform.isWindows ? 'where' : 'which';
+      final args = Platform.isWindows ? ['java'] : ['-a', 'java'];
+      
+      final result = await Process.run(cmd, args, runInShell: true)
           .timeout(const Duration(seconds: 3));
       if (result.exitCode == 0) {
         for (final line in result.stdout.toString().split('\n')) {
           final path = line.trim();
-          if (path.endsWith('.exe') && await File(path).exists()) {
+          if (path.isEmpty) continue;
+          if (Platform.isWindows && !path.endsWith('.exe')) continue;
+          
+          if (await File(path).exists()) {
             paths.add(path);
           }
         }
       }
-    } catch (e) {}
+    } catch (e) {
+      
+    }
   }
 
   Future<void> _scanDirectoryForJava(String basePath, Set<String> paths, {int maxDepth = 3}) async {
@@ -263,12 +302,13 @@ class JavaService extends ChangeNotifier {
       try {
         await for (final entity in Directory(currentPath).list()) {
           if (entity is Directory) {
-            final javaExe = p.join(entity.path, 'java.exe');
+            final executableName = Platform.isWindows ? 'java.exe' : 'java';
+            final javaExe = p.join(entity.path, executableName);
             if (await File(javaExe).exists()) {
               paths.add(javaExe);
             }
             
-            final binJavaExe = p.join(entity.path, 'bin', 'java.exe');
+            final binJavaExe = p.join(entity.path, 'bin', executableName);
             if (await File(binJavaExe).exists()) {
               paths.add(binJavaExe);
             }
@@ -278,7 +318,9 @@ class JavaService extends ChangeNotifier {
             }
           }
         }
-      } catch (e) {}
+      } catch (e) {
+        
+      }
     }
   }
 

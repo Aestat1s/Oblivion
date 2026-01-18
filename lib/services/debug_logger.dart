@@ -27,10 +27,10 @@ class DebugLogger {
     }
   }
 
-  /// 获取所有日志
+  
   List<String> get logs => List.unmodifiable(_logs);
 
-  /// 导出日志到文件
+  
   Future<String> exportLogs({String? directory}) async {
     final dir = directory ?? 'D:';
     final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-').split('.').first;
@@ -52,7 +52,7 @@ class DebugLogger {
     return filePath;
   }
 
-  /// 清除日志
+  
   void clear() {
     _logs.clear();
     log('Logs cleared');

@@ -61,7 +61,7 @@ class ResourceDownloadService extends ChangeNotifier {
   bool _isSearching = false;
   int _currentPage = 0;
   List<ResourceCategory> _categories = [];
-  int _searchVersion = 0; // 用于防止快速切换时的数据串扰
+  int _searchVersion = 0; 
 
   ResourceDownloadService(this._downloadService);
 
@@ -147,7 +147,7 @@ class ResourceDownloadService extends ChangeNotifier {
     _isSearching = true;
     _storage.errorMessage = null;
     _storage.results = [];
-    _searchVersion++; // 增加搜索版本号
+    _searchVersion++; 
     final currentVersion = _searchVersion;
     notifyListeners();
 

@@ -268,7 +268,7 @@ class AccountService extends ChangeNotifier {
   
   Future<bool> refreshMicrosoftToken(Account account) async {
     final refreshToken = account.refreshToken;
-    if (account.type != AccountType.microsoft || refreshToken == null) {
+    if (account.type != AccountType.microsoft) {
       return false;
     }
 

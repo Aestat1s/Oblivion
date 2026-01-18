@@ -1,4 +1,4 @@
-﻿import 'dart:convert';
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -8,6 +8,7 @@ import '../services/account_service.dart';
 import '../services/game_service.dart';
 import '../services/java_service.dart';
 import '../services/config_service.dart';
+import '../services/update_service.dart';
 import '../models/java_info.dart';
 import '../l10n/app_localizations.dart';
 
@@ -30,6 +31,63 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _fetchHitokoto();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkUpdatesAndAnnouncement());
+  }
+
+  Future<void> _checkUpdatesAndAnnouncement() async {
+    final updateService = context.read<UpdateService>();
+    final configService = context.read<ConfigService>();
+    
+    
+    final announcement = await updateService.fetchAnnouncement();
+    if (announcement != null && announcement != configService.settings.announcementText) {
+      configService.settings.announcementText = announcement;
+      configService.save();
+    }
+    
+    
+    if (configService.settings.checkUpdates && !updateService.hasShownDialog) {
+      final update = await updateService.checkUpdate();
+      if (update != null && mounted && !updateService.hasShownDialog) {
+        updateService.markDialogShown();
+        _showUpdateDialog(update);
+      }
+    }
+  }
+
+  void _showUpdateDialog(UpdateInfo update) {
+    final updateService = context.read<UpdateService>();
+    final configService = context.read<ConfigService>();
+    
+    showDialog(
+      context: context,
+      barrierDismissible: !configService.settings.autoUpdate,
+      builder: (context) => AlertDialog(
+        title: Text('发现新版本 ${update.version}'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('更新内容：\n${update.changelog}'),
+            const SizedBox(height: 16),
+            Text('发布时间：${update.updatedAt.toString().split('.')[0]}'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('稍后'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(context);
+              updateService.performUpdate(update.downloadUrl);
+            },
+            child: const Text('立即更新'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _fetchHitokoto() async {
@@ -49,28 +107,35 @@ class _HomeScreenState extends State<HomeScreen> {
     final accountService = context.watch<AccountService>();
     final gameService = context.watch<GameService>();
     final javaService = context.watch<JavaService>();
-    context.watch<ConfigService>();
+    final configService = context.watch<ConfigService>();
+    final showRightPanel = configService.settings.showRightPanel;
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final isWide = constraints.maxWidth > 800;
-        if (isWide) {
-          return _buildWideLayout(accountService, gameService, javaService);
+        
+        
+        final canShowTwoColumns = constraints.maxWidth > 700;
+        final useTwoColumns = showRightPanel && canShowTwoColumns;
+
+        if (useTwoColumns) {
+          return _buildTwoColumnLayout(accountService, gameService, javaService, configService);
         } else {
-          return _buildNarrowLayout(accountService, gameService, javaService);
+          return _buildSingleColumnLayout(accountService, gameService, javaService, configService);
         }
       },
     );
   }
 
-  Widget _buildWideLayout(AccountService accountService, GameService gameService, JavaService javaService) {
+  Widget _buildTwoColumnLayout(AccountService accountService, GameService gameService, JavaService javaService, ConfigService configService) {
+    final showLaunchLog = configService.settings.showLaunchLog;
+
     return Padding(
       padding: const EdgeInsets.all(24),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: 320,
+            width: 340, 
             child: Column(
               children: [
                 _buildWelcomeCard(),
@@ -86,27 +151,92 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
           const SizedBox(width: 24),
-          Expanded(child: _buildLogCard()),
+          Expanded(
+            child: showLaunchLog 
+                ? _buildLogCard() 
+                : _buildAnnouncementCard(configService.settings.announcementText),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildNarrowLayout(AccountService accountService, GameService gameService, JavaService javaService) {
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: [
-          _buildWelcomeCard(),
-          const SizedBox(height: 12),
-          _buildAccountCard(accountService),
-          const SizedBox(height: 12),
-          _buildVersionCard(gameService),
-          const SizedBox(height: 12),
-          Expanded(child: _buildLogCard()),
-          const SizedBox(height: 12),
-          _buildLaunchSection(),
-        ],
+  Widget _buildSingleColumnLayout(AccountService accountService, GameService gameService, JavaService javaService, ConfigService configService) {
+    final showRightPanel = configService.settings.showRightPanel;
+    final showLaunchLog = configService.settings.showLaunchLog;
+
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 500), 
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _buildWelcomeCard(),
+              const SizedBox(height: 12),
+              _buildAccountCard(accountService),
+              const SizedBox(height: 12),
+              _buildVersionCard(gameService),
+              const SizedBox(height: 12),
+              
+              
+              if (showRightPanel) ...[
+                SizedBox(
+                  height: 300, 
+                  child: showLaunchLog 
+                      ? _buildLogCard() 
+                      : _buildAnnouncementCard(configService.settings.announcementText),
+                ),
+                const SizedBox(height: 12),
+              ],
+              if (configService.settings.autoSelectJava == false && javaService.detectedJavas.isNotEmpty) ...[
+                 _buildJavaCard(javaService),
+                 const SizedBox(height: 12),
+              ],
+              const Spacer(),
+              _buildLaunchSection(),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAnnouncementCard(String text) {
+    return Card(
+      elevation: 0,
+      color: Theme.of(context).colorScheme.surfaceContainerLow,
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.campaign, color: Theme.of(context).colorScheme.primary),
+                const SizedBox(width: 12),
+                Text(
+                  '公告', 
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            const Divider(height: 32),
+            Expanded(
+              child: SingleChildScrollView(
+                child: Text(
+                  text,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    height: 1.5,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -114,6 +244,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildWelcomeCard() {
     final l10n = AppLocalizations.of(context);
     return Card(
+      elevation: 0,
       color: Theme.of(context).colorScheme.primaryContainer,
       child: Padding(
         padding: const EdgeInsets.all(20),
@@ -143,7 +274,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   Text(
                     _hitokoto.isNotEmpty ? _hitokoto : l10n.get('ready_to_play'),
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onPrimaryContainer.withOpacity(0.8),
+                      color: Theme.of(context).colorScheme.onPrimaryContainer.withValues(alpha: 0.8),
                     ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
@@ -249,7 +380,7 @@ class _HomeScreenState extends State<HomeScreen> {
         final baseVersion = version?.inheritsFrom ?? selectedVersion;
         final (minJava, maxJava) = JavaService.getRequiredJavaVersion(baseVersion);
         java = service.selectJavaForVersion(minJava, maxVersion: maxJava);
-        javaStatus = '自动 (${minJava}${maxJava != null ? "-$maxJava" : "+"})';
+        javaStatus = '自动 ($minJava${maxJava != null ? "-$maxJava" : "+"})';
       } else {
         java = service.detectedJavas.isNotEmpty ? service.detectedJavas.first : null;
         javaStatus = '自动';
@@ -404,6 +535,8 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildLogCard() {
     final l10n = AppLocalizations.of(context);
     return Card(
+      elevation: 0,
+      color: Theme.of(context).colorScheme.surfaceContainerLow,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -617,9 +750,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void _showCrashDialog() {
     final l10n = AppLocalizations.of(context);
     
-    
     final logLines = _gameLog.split('\n').where((line) => line.trim().isNotEmpty).toList();
-    
     
     final errorLines = logLines.where((line) =>
       line.contains('Error') || line.contains('Exception') || 
@@ -627,7 +758,6 @@ class _HomeScreenState extends State<HomeScreen> {
       line.contains('at ') || line.contains('failed') ||
       line.contains('Unable to') || line.contains('Cannot')
     ).take(50).toList();
-    
     
     final displayLog = errorLines.isNotEmpty 
         ? errorLines.join('\n') 
@@ -729,45 +859,56 @@ class _InfoCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
+      elevation: 0,
+      color: Theme.of(context).colorScheme.surfaceContainer,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         child: Padding(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.all(16),
           child: Row(
             children: [
               Container(
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: iconColor.withOpacity(0.15),
+                  color: iconColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(icon, color: iconColor, size: 20),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
-                        Text(title, style: Theme.of(context).textTheme.labelMedium),
+                        Text(title, style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        )),
                         if (badge != null) ...[
-                          const SizedBox(width: 6),
+                          const SizedBox(width: 8),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
                               color: Theme.of(context).colorScheme.surfaceContainerHighest,
                               borderRadius: BorderRadius.circular(4),
                             ),
-                            child: Text(badge!, style: Theme.of(context).textTheme.labelSmall),
+                            child: Text(badge!, style: Theme.of(context).textTheme.labelSmall?.copyWith(fontSize: 10)),
                           ),
                         ],
                       ],
                     ),
-                    const SizedBox(height: 2),
-                    Text(subtitle, style: Theme.of(context).textTheme.bodyMedium, maxLines: 1, overflow: TextOverflow.ellipsis),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle, 
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        fontWeight: FontWeight.w500,
+                      ),
+                      maxLines: 2, 
+                      overflow: TextOverflow.ellipsis
+                    ),
                   ],
                 ),
               ),

@@ -1,4 +1,4 @@
-﻿import 'dart:io';
+import 'dart:io';
 import 'package:path/path.dart' as p;
 
 enum JavaBrandType {
@@ -168,6 +168,44 @@ class JavaInfo {
   }
 
   
+  static JavaInfo? parse(String output, String path) {
+      String version = '';
+      int majorVersion = 0;
+      bool is64Bit = output.contains('64-Bit') || output.contains('64-bit') || output.contains('x64');
+
+      final versionMatch = RegExp(r'version "([^"]+)"').firstMatch(output);
+      if (versionMatch != null) {
+        version = versionMatch.group(1)!;
+        if (version.startsWith('1.')) {
+          majorVersion = int.tryParse(version.split('.')[1]) ?? 0;
+        } else {
+          majorVersion = int.tryParse(version.split('.')[0]) ?? 0;
+        }
+      } else {
+        
+        final simpleMatch = RegExp(r'(?:java|openjdk)(?: version)?\s+([0-9]+)(?:\.|-)').firstMatch(output);
+        if (simpleMatch != null) {
+           final verStr = simpleMatch.group(1);
+           if (verStr != null) {
+              majorVersion = int.tryParse(verStr) ?? 0;
+              version = verStr; 
+           }
+        }
+      }
+
+      if (majorVersion == 0) return null;
+
+      return JavaInfo(
+        path: path,
+        version: version,
+        majorVersion: majorVersion,
+        brand: _determineBrandFromString(output),
+        vendor: 'Unknown', 
+        is64Bit: is64Bit,
+        architecture: is64Bit ? 'x64' : 'x86',
+      );
+  }
+
   static Future<JavaInfo?> fromPath(String javaPath) async {
     try {
       final file = File(javaPath);
@@ -190,76 +228,19 @@ class JavaInfo {
       final output = result.stderr.toString();
       if (output.isEmpty) return null;
 
-      String version = '';
-      int majorVersion = 0;
-      bool is64Bit = output.contains('64-Bit');
-
-      final versionMatch = RegExp(r'version "([^"]+)"').firstMatch(output);
-      if (versionMatch != null) {
-        version = versionMatch.group(1)!;
-        final majorMatch = RegExp(r'^(\d+)').firstMatch(version);
-        if (majorMatch != null) {
-          final major = int.parse(majorMatch.group(1)!);
-          
-          majorVersion = major == 1 ? 8 : major;
-        }
-      }
-      
-      
-      if (version.isEmpty && fileVersion != null && fileVersion.isNotEmpty) {
-        version = fileVersion;
-      }
+      final info = parse(output, javaPath);
+      if (info == null) return null;
 
       
-      
-      JavaBrandType brand = JavaBrandType.unknown;
-      
-      
-      if (companyName != null) {
-        if (companyName.contains('Oracle') || companyName == 'N/A') {
-          
-          final desc = fileDescription ?? productName ?? '';
-          if (desc.contains('Java(TM)')) {
-            brand = JavaBrandType.oracle;
-          } else {
-            brand = JavaBrandType.openJDK;
-          }
-        } else {
-          brand = _determineBrandFromString(companyName);
-        }
-      }
-      
-      
-      if (brand == JavaBrandType.unknown) {
-        brand = _determineBrandFromString(fileDescription);
-      }
-      if (brand == JavaBrandType.unknown) {
-        brand = _determineBrandFromString(productName);
-      }
-      
-      
-      if (brand == JavaBrandType.unknown) {
-        brand = _determineBrandFromString(output);
-      }
-      
-      
-      if (brand == JavaBrandType.unknown) {
-        brand = _determineBrandFromPath(javaPath);
-      }
-      
-      
-      final javaDir = p.dirname(javaPath);
-      final isJre = !await File(p.join(javaDir, 'javac.exe')).exists();
-
       return JavaInfo(
-        path: javaPath,
-        version: version,
-        majorVersion: majorVersion,
-        brand: brand,
-        vendor: _brandToDisplayName(brand),
-        is64Bit: is64Bit,
-        architecture: is64Bit ? 'x64' : 'x86',
-        isJre: isJre,
+        path: info.path,
+        version: info.version,
+        majorVersion: info.majorVersion,
+        brand: info.brand != JavaBrandType.unknown ? info.brand : _determineBrandFromString(companyName ?? productName),
+        vendor: companyName ?? 'Unknown',
+        is64Bit: info.is64Bit,
+        architecture: info.architecture,
+        isJre: fileDescription?.contains('JRE') ?? false,
       );
     } catch (e) {
       return null;

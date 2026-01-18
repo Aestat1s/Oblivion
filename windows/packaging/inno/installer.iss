@@ -1,15 +1,15 @@
 [Setup]
 AppId={{com.oblivion.launcher}
 AppName=Oblivion Launcher
-AppVersion=1.0.1
-AppVerName=Oblivion Launcher 1.0.1
+AppVersion=1.0.3
+AppVerName=Oblivion Launcher 1.0.3
 AppPublisher=Aestat1s Team
 AppPublisherURL=https://github.com/Aestat1s
 DefaultDirName={autopf}\Oblivion
 DefaultGroupName=Oblivion Launcher
 DisableProgramGroupPage=yes
-OutputDir=..\..\..\dist\1.0.1+2
-OutputBaseFilename=oblivion_launcher-1.0.1+2-windows-setup
+OutputDir=..\..\..\dist\1.0.3+3
+OutputBaseFilename=oblivion_launcher-1.0.3+3-windows-setup
 SetupIconFile=..\..\runner\resources\app_icon.ico
 Compression=lzma2/ultra64
 SolidCompression=yes

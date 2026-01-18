@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import '../models/resource_item.dart';
-import 'debug_logger.dart';
 
 class FavoritesService extends ChangeNotifier {
   final String _dataDir;

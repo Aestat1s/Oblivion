@@ -269,7 +269,7 @@ class ModpackInstallService extends ChangeNotifier {
       final modLoaders = minecraft['modLoaders'] as List?;
       if (modLoaders != null) {
         for (final loader in modLoaders) {
-          final id = loader['id']?.toString()?.toLowerCase() ?? '';
+          final id = loader['id']?.toString().toLowerCase() ?? '';
           if (id.startsWith('forge-')) {
             forgeVersion = id.replaceFirst('forge-', '');
           } else if (id.startsWith('fabric-')) {

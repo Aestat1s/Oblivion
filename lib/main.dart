@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:flutter_acrylic/flutter_acrylic.dart';
@@ -16,6 +16,9 @@ import 'services/theme_service.dart';
 import 'services/modpack_install_service.dart';
 import 'services/mod_service.dart';
 import 'services/debug_logger.dart';
+import 'services/analytics_service.dart';
+import 'services/update_service.dart';
+import 'services/resource_service.dart';
 import 'models/config.dart';
 
 void main() async {
@@ -32,7 +35,7 @@ void main() async {
 
   WindowOptions windowOptions = const WindowOptions(
     size: Size(1200, 800),
-    minimumSize: Size(800, 600),
+    minimumSize: Size(360, 600),
     center: true,
     backgroundColor: Colors.transparent,
     skipTaskbar: false,
@@ -58,6 +61,12 @@ void main() async {
   final themeService = ThemeService();
   await themeService.initialize(configService.settings);
 
+  final analyticsService = AnalyticsService();
+  await analyticsService.init();
+
+  final updateService = UpdateService();
+  
+
   if (configService.settings.backgroundType == BackgroundType.image ||
       configService.settings.backgroundType == BackgroundType.randomImage) {
     await themeService.extractColorFromCurrentBackground(configService.settings);
@@ -74,13 +83,16 @@ void main() async {
         ChangeNotifierProvider(create: (_) => configService),
         ChangeNotifierProvider(create: (_) => downloadService),
         ChangeNotifierProvider(create: (_) => AccountService(configService)),
-        ChangeNotifierProvider(create: (context) => GameService(configService)),
+        ChangeNotifierProvider(create: (context) => GameService(configService, analyticsService)),
         ChangeNotifierProvider.value(value: javaService),
         ChangeNotifierProvider.value(value: modDownloadService),
         ChangeNotifierProvider.value(value: resourceDownloadService),
         ChangeNotifierProvider.value(value: favoritesService),
         ChangeNotifierProvider.value(value: themeService),
-        ChangeNotifierProvider(create: (_) => ModService()),
+        Provider.value(value: analyticsService),
+        ChangeNotifierProvider(create: (_) => updateService),
+        ChangeNotifierProvider(create: (_) => ModService(configService.gameDirectory)),
+        ChangeNotifierProvider(create: (_) => ResourceService()),
         ChangeNotifierProxyProvider2<GameService, DownloadService, ModpackInstallService>(
           create: (context) => ModpackInstallService(
             context.read<GameService>(),
@@ -121,7 +133,7 @@ Future<void> applyWindowEffect(GlobalSettings settings) async {
         break;
     }
 
-    // Apply window opacity
+    
     await applyWindowOpacity(settings.windowOpacity);
 
     debugLog('Window effect applied successfully');

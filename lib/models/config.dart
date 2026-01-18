@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart' show ThemeMode;
+import 'package:flutter/material.dart' show ThemeMode;
 import 'account.dart';
 
 enum DownloadSource { official, bmclapi }
@@ -64,9 +64,10 @@ class GlobalSettings {
   ThemeMode themeMode;
   String language;
   bool checkUpdates;
+  bool autoUpdate;
   IsolationType defaultIsolation;
   
-  // 个性化设置
+  
   BackgroundType backgroundType;
   String? customBackgroundPath;
   String? randomImageApi;
@@ -76,6 +77,12 @@ class GlobalSettings {
   int? customThemeColor;
   String? customFontFamily;
   double windowOpacity;
+  bool showLaunchLog;
+  bool showRightPanel;
+  String announcementText;
+  bool showAnnouncement;
+  bool enableAnalytics;
+  bool isFirstRun;
 
   GlobalSettings({
     this.gameDirectory = '',
@@ -91,21 +98,104 @@ class GlobalSettings {
     this.windowHeight = 480,
     this.fullscreen = false,
     this.downloadSource = DownloadSource.official,
-    this.concurrentDownloads = 64,
+    this.concurrentDownloads = 16,
     this.themeMode = ThemeMode.dark,
     this.language = 'zh',
     this.checkUpdates = true,
+    this.autoUpdate = true,
     this.defaultIsolation = IsolationType.none,
+    
+    
     this.backgroundType = BackgroundType.none,
     this.customBackgroundPath,
-    this.randomImageApi = 'https://t.alcy.cc/pc',
+    this.randomImageApi,
     this.backgroundBlur = 0.0,
-    this.enableCustomColor = false,
+    this.enableCustomColor = true,
     this.themeColorSource = ThemeColorSource.system,
     this.customThemeColor,
     this.customFontFamily,
-    this.windowOpacity = 1.0,
+    this.windowOpacity = 0.9,
+    this.showLaunchLog = true,
+    this.showRightPanel = true,
+    this.announcementText = '',
+    this.showAnnouncement = true,
+    this.enableAnalytics = true,
+    this.isFirstRun = true,
   });
+
+  GlobalSettings copyWith({
+    String? gameDirectory,
+    String? javaPath,
+    bool? autoSelectJava,
+    bool? autoCompleteFiles,
+    bool? dynamicMemory,
+    int? minMemory,
+    int? maxMemory,
+    String? jvmArgs,
+    String? gameArgs,
+    int? windowWidth,
+    int? windowHeight,
+    bool? fullscreen,
+    DownloadSource? downloadSource,
+    int? concurrentDownloads,
+    ThemeMode? themeMode,
+    String? language,
+    bool? checkUpdates,
+    bool? autoUpdate,
+    IsolationType? defaultIsolation,
+    BackgroundType? backgroundType,
+    String? customBackgroundPath,
+    String? randomImageApi,
+    double? backgroundBlur,
+    bool? enableCustomColor,
+    ThemeColorSource? themeColorSource,
+    int? customThemeColor,
+    String? customFontFamily,
+    double? windowOpacity,
+    bool? showLaunchLog,
+    bool? showRightPanel,
+    String? announcementText,
+    bool? showAnnouncement,
+    bool? enableAnalytics,
+    bool? isFirstRun,
+  }) {
+    return GlobalSettings(
+      gameDirectory: gameDirectory ?? this.gameDirectory,
+      javaPath: javaPath ?? this.javaPath,
+      autoSelectJava: autoSelectJava ?? this.autoSelectJava,
+      autoCompleteFiles: autoCompleteFiles ?? this.autoCompleteFiles,
+      dynamicMemory: dynamicMemory ?? this.dynamicMemory,
+      minMemory: minMemory ?? this.minMemory,
+      maxMemory: maxMemory ?? this.maxMemory,
+      jvmArgs: jvmArgs ?? this.jvmArgs,
+      gameArgs: gameArgs ?? this.gameArgs,
+      windowWidth: windowWidth ?? this.windowWidth,
+      windowHeight: windowHeight ?? this.windowHeight,
+      fullscreen: fullscreen ?? this.fullscreen,
+      downloadSource: downloadSource ?? this.downloadSource,
+      concurrentDownloads: concurrentDownloads ?? this.concurrentDownloads,
+      themeMode: themeMode ?? this.themeMode,
+      language: language ?? this.language,
+      checkUpdates: checkUpdates ?? this.checkUpdates,
+      autoUpdate: autoUpdate ?? this.autoUpdate,
+      defaultIsolation: defaultIsolation ?? this.defaultIsolation,
+      backgroundType: backgroundType ?? this.backgroundType,
+      customBackgroundPath: customBackgroundPath ?? this.customBackgroundPath,
+      randomImageApi: randomImageApi ?? this.randomImageApi,
+      backgroundBlur: backgroundBlur ?? this.backgroundBlur,
+      enableCustomColor: enableCustomColor ?? this.enableCustomColor,
+      themeColorSource: themeColorSource ?? this.themeColorSource,
+      customThemeColor: customThemeColor ?? this.customThemeColor,
+      customFontFamily: customFontFamily ?? this.customFontFamily,
+      windowOpacity: windowOpacity ?? this.windowOpacity,
+      showLaunchLog: showLaunchLog ?? this.showLaunchLog,
+      showRightPanel: showRightPanel ?? this.showRightPanel,
+      announcementText: announcementText ?? this.announcementText,
+      showAnnouncement: showAnnouncement ?? this.showAnnouncement,
+      enableAnalytics: enableAnalytics ?? this.enableAnalytics,
+      isFirstRun: isFirstRun ?? this.isFirstRun,
+    );
+  }
 
   Map<String, dynamic> toJson() => {
     'gameDirectory': gameDirectory,
@@ -125,6 +215,7 @@ class GlobalSettings {
     'themeMode': themeMode.index,
     'language': language,
     'checkUpdates': checkUpdates,
+    'autoUpdate': autoUpdate,
     'defaultIsolation': defaultIsolation.index,
     'backgroundType': backgroundType.index,
     'customBackgroundPath': customBackgroundPath,
@@ -135,6 +226,12 @@ class GlobalSettings {
     'customThemeColor': customThemeColor,
     'customFontFamily': customFontFamily,
     'windowOpacity': windowOpacity,
+    'showLaunchLog': showLaunchLog,
+    'showRightPanel': showRightPanel,
+    'announcementText': announcementText,
+    'showAnnouncement': showAnnouncement,
+    'enableAnalytics': enableAnalytics,
+    'isFirstRun': isFirstRun,
   };
 
   factory GlobalSettings.fromJson(Map<String, dynamic> json) => GlobalSettings(
@@ -152,19 +249,26 @@ class GlobalSettings {
     fullscreen: json['fullscreen'] ?? false,
     downloadSource: DownloadSource.values[json['downloadSource'] ?? 0],
     concurrentDownloads: json['concurrentDownloads'] ?? 64,
-    themeMode: ThemeMode.values[json['themeMode'] ?? json['theme'] ?? 2],
-    language: json['language'] ?? 'zh',
-    checkUpdates: json['checkUpdates'] ?? true,
-    defaultIsolation: IsolationType.values[json['defaultIsolation'] ?? 0],
+    themeMode: ThemeMode.values[json['themeMode'] ?? 2],
+      language: json['language'] ?? 'zh',
+      checkUpdates: json['checkUpdates'] ?? true,
+      autoUpdate: json['autoUpdate'] ?? true,
+      defaultIsolation: IsolationType.values[json['defaultIsolation'] ?? 0],
     backgroundType: BackgroundType.values[json['backgroundType'] ?? 0],
     customBackgroundPath: json['customBackgroundPath'],
-    randomImageApi: json['randomImageApi'] ?? json['randomImageApiHorizontal'] ?? 'https://t.alcy.cc/pc',
-    backgroundBlur: json['backgroundBlur']?.toDouble() ?? 0.0,
-    enableCustomColor: json['enableCustomColor'] ?? false,
+    randomImageApi: json['randomImageApi'],
+    backgroundBlur: (json['backgroundBlur'] ?? 0.0).toDouble(),
+    enableCustomColor: json['enableCustomColor'] ?? true,
     themeColorSource: ThemeColorSource.values[json['themeColorSource'] ?? 0],
     customThemeColor: json['customThemeColor'],
     customFontFamily: json['customFontFamily'],
-    windowOpacity: json['windowOpacity']?.toDouble() ?? 1.0,
+    windowOpacity: (json['windowOpacity'] ?? 0.9).toDouble(),
+    showLaunchLog: json['showLaunchLog'] ?? true,
+    showRightPanel: json['showRightPanel'] ?? true,
+    announcementText: json['announcementText'] ?? '',
+    showAnnouncement: json['showAnnouncement'] ?? true,
+    enableAnalytics: json['enableAnalytics'] ?? true,
+    isFirstRun: json['isFirstRun'] ?? true,
   );
 }
 

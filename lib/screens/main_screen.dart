@@ -1,4 +1,4 @@
-﻿import 'dart:io';
+import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -6,6 +6,7 @@ import '../l10n/app_localizations.dart';
 import '../widgets/custom_title_bar.dart';
 import '../services/config_service.dart';
 import '../services/theme_service.dart';
+import '../services/analytics_service.dart';
 import '../models/config.dart';
 import 'home_screen.dart';
 import 'accounts_screen.dart';
@@ -33,11 +34,54 @@ class _MainScreenState extends State<MainScreen> {
     AboutScreen(),
   ];
 
+  final List<String> _paths = const [
+    '/home',
+    '/accounts',
+    '/versions',
+    '/downloads',
+    '/settings',
+    '/about',
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _trackCurrentPage();
+    });
+  }
+
+  void _onItemTapped(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+    _trackCurrentPage();
+  }
+
+  void _trackCurrentPage() {
+    if (!mounted) return;
+    final l10n = AppLocalizations.of(context);
+    final analytics = context.read<AnalyticsService>();
+    final path = _paths[_selectedIndex];
+    
+    String title = 'Home';
+    switch (_selectedIndex) {
+      case 0: title = l10n.get('nav_home'); break;
+      case 1: title = l10n.get('nav_accounts'); break;
+      case 2: title = l10n.get('nav_versions'); break;
+      case 3: title = l10n.get('nav_downloads'); break;
+      case 4: title = l10n.get('nav_settings'); break;
+      case 5: title = l10n.get('nav_about'); break;
+    }
+    
+    analytics.trackPageView(path, title);
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final width = MediaQuery.of(context).size.width;
-    final isWide = width > 600;
+    final useRail = width >= 640; 
     final configService = context.watch<ConfigService>();
     final themeService = context.watch<ThemeService>();
     final settings = configService.settings;
@@ -57,16 +101,16 @@ class _MainScreenState extends State<MainScreen> {
           : Colors.transparent,
       body: Stack(
         children: [
-          // Background layer
+          
           _buildBackground(settings, themeService),
-          // Main content
+          
           Column(
             children: [
               const CustomTitleBar(),
               Expanded(
                 child: Row(
                   children: [
-                    if (isWide) _buildNavigationRail(destinations, settings),
+                    if (useRail) _buildNavigationRail(destinations, settings),
                     Expanded(
                       child: _screens[_selectedIndex],
                     ),
@@ -77,9 +121,9 @@ class _MainScreenState extends State<MainScreen> {
           ),
         ],
       ),
-      bottomNavigationBar: isWide ? null : NavigationBar(
+      bottomNavigationBar: useRail ? null : NavigationBar(
         selectedIndex: _selectedIndex,
-        onDestinationSelected: (index) => setState(() => _selectedIndex = index),
+        onDestinationSelected: _onItemTapped,
         destinations: destinations.map((d) => NavigationDestination(
           icon: Icon(d.icon),
           selectedIcon: Icon(d.selectedIcon),
@@ -107,7 +151,7 @@ class _MainScreenState extends State<MainScreen> {
       return const SizedBox.shrink();
     }
     
-    // Use backgroundVersion as key to force rebuild when image changes
+    
     return Container(
       key: ValueKey('bg_${themeService.backgroundVersion}_$imagePath'),
       decoration: BoxDecoration(
@@ -133,7 +177,7 @@ class _MainScreenState extends State<MainScreen> {
     final hasCustomBackground = settings.backgroundType != BackgroundType.none;
     final surfaceOpacity = hasCustomBackground ? 0.85 : 1.0;
     
-    // MD3 Pad style - fixed width navigation rail
+    
     return Container(
       width: 80,
       decoration: BoxDecoration(
@@ -153,7 +197,7 @@ class _MainScreenState extends State<MainScreen> {
                 return Padding(
                   padding: const EdgeInsets.symmetric(vertical: 4),
                   child: InkWell(
-                    onTap: () => setState(() => _selectedIndex = index),
+                    onTap: () => _onItemTapped(index),
                     borderRadius: BorderRadius.circular(16),
                     hoverColor: colorScheme.onSurface.withValues(alpha: 0.08),
                     child: Column(

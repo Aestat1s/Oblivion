@@ -1,4 +1,4 @@
-/// 资源类型枚举
+
 enum ResourceType {
   mod,
   modpack,
@@ -8,10 +8,10 @@ enum ResourceType {
   datapack,
 }
 
-/// 资源来源
+
 enum ResourceSource { modrinth, curseforge }
 
-/// 远程资源项
+
 class ResourceItem {
   final String id;
   final String slug;
@@ -126,7 +126,7 @@ class ResourceItem {
   }
 }
 
-/// 资源版本
+
 class ResourceVersion {
   final String id;
   final String projectId;
@@ -196,7 +196,7 @@ class ResourceVersion {
   }
 }
 
-/// 资源文件
+
 class ResourceFile {
   final String url;
   final String filename;
@@ -227,9 +227,9 @@ class ResourceFile {
     final fileName = json['fileName'] ?? '';
     final fileId = json['id']?.toString() ?? '';
     
-    // 如果 downloadUrl 为空，构造备用 URL
+    
     if (url.isEmpty && fileId.isNotEmpty && fileName.isNotEmpty) {
-      // CurseForge 备用下载地址格式: https://edge.forgecdn.net/files/{前4位}/{后几位}/{文件名}
+      
       final part1 = fileId.length >= 4 ? fileId.substring(0, 4) : fileId;
       final part2 = fileId.length > 4 ? int.tryParse(fileId.substring(4))?.toString() ?? fileId.substring(4) : '0';
       url = 'https://edge.forgecdn.net/files/$part1/$part2/${Uri.encodeComponent(fileName)}';

@@ -1,8 +1,9 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
 import '../services/config_service.dart';
 import '../services/java_service.dart';
+import '../services/update_service.dart';
 import '../models/config.dart';
 import '../l10n/app_localizations.dart';
 import '../widgets/personalization_settings.dart';
@@ -28,39 +29,43 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final l10n = AppLocalizations.of(context);
     final config = context.watch<ConfigService>();
     final javaService = context.watch<JavaService>();
+    final updateService = context.watch<UpdateService>();
     final settings = config.settings;
-    final screenWidth = MediaQuery.of(context).size.width;
-    // Use two-column layout only when width is sufficient (> 900px)
-    final isWide = screenWidth > 900;
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(l10n.get('settings'), style: Theme.of(context).textTheme.headlineMedium),
-          Text(l10n.get('settings_hint'), style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          )),
-          const SizedBox(height: 24),
-          isWide
-              ? Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(child: _buildLeftColumn(config, javaService, settings, l10n)),
-                    const SizedBox(width: 24),
-                    Expanded(child: _buildRightColumn(config, settings, l10n)),
-                  ],
-                )
-              : Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _buildLeftColumn(config, javaService, settings, l10n),
-                    _buildRightColumn(config, settings, l10n),
-                  ],
-                ),
-        ],
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isWide = constraints.maxWidth > 800;
+        
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(l10n.get('settings'), style: Theme.of(context).textTheme.headlineMedium),
+              Text(l10n.get('settings_hint'), style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              )),
+              const SizedBox(height: 24),
+              isWide
+                  ? Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(child: _buildLeftColumn(config, javaService, settings, l10n)),
+                        const SizedBox(width: 24),
+                        Expanded(child: _buildRightColumn(config, settings, l10n, updateService)),
+                      ],
+                    )
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _buildLeftColumn(config, javaService, settings, l10n),
+                        _buildRightColumn(config, settings, l10n, updateService),
+                      ],
+                    ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -172,10 +177,107 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _buildRightColumn(ConfigService config, GlobalSettings settings, AppLocalizations l10n) {
+  Widget _buildRightColumn(ConfigService config, GlobalSettings settings, AppLocalizations l10n, UpdateService updateService) {
     return Column(
       children: [
         const PersonalizationSettings(),
+        _buildSection('更新设置', Icons.system_update, [
+          SwitchListTile(
+            title: const Text('自动检查更新'),
+            subtitle: const Text('启动时自动检查新版本'),
+            value: settings.checkUpdates,
+            onChanged: (v) {
+              settings.checkUpdates = v;
+              config.save();
+              setState(() {});
+            },
+          ),
+          SwitchListTile(
+            title: const Text('自动下载更新'),
+            subtitle: const Text('发现新版本时自动下载并安装'),
+            value: settings.autoUpdate,
+            onChanged: (v) {
+              settings.autoUpdate = v;
+              config.save();
+              setState(() {});
+            },
+          ),
+          ListTile(
+            title: const Text('检查更新'),
+            subtitle: updateService.latestUpdate != null 
+                ? Text('发现新版本: ${updateService.latestUpdate!.version}')
+                : const Text('点击检查是否有新版本'),
+            trailing: IconButton(
+              icon: const Icon(Icons.refresh),
+              onPressed: () async {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('正在检查更新...')),
+                );
+                final update = await updateService.checkUpdate(force: true);
+                if (mounted) {
+                  if (update != null) {
+                    showDialog(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: Text('发现新版本 ${update.version}'),
+                        content: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('更新内容：\n${update.changelog}'),
+                            const SizedBox(height: 16),
+                            Text('发布时间：${update.updatedAt.toString().split('.')[0]}'),
+                          ],
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text('稍后'),
+                          ),
+                          FilledButton(
+                            onPressed: () {
+                              Navigator.pop(context);
+                              updateService.performUpdate(update.downloadUrl);
+                            },
+                            child: const Text('立即更新'),
+                          ),
+                        ],
+                      ),
+                    );
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('当前已是最新版本')),
+                    );
+                  }
+                }
+              },
+            ),
+          ),
+        ]),
+        _buildSection(l10n.get('home_screen_settings'), Icons.home, [
+          SwitchListTile(
+            title: Text(l10n.get('show_right_panel')),
+            subtitle: Text(l10n.get('show_right_panel_hint')),
+            value: settings.showRightPanel,
+            onChanged: (v) {
+              settings.showRightPanel = v;
+              config.save();
+              setState(() {});
+            },
+          ),
+          SwitchListTile(
+            title: Text(l10n.get('show_launch_log')),
+            subtitle: Text(l10n.get('show_launch_log_hint')),
+            value: settings.showLaunchLog,
+            onChanged: settings.showRightPanel
+                ? (v) {
+                    settings.showLaunchLog = v;
+                    config.save();
+                    setState(() {});
+                  }
+                : null,
+          ),
+        ]),
         _buildSection(l10n.get('memory_settings'), Icons.memory, [
           SwitchListTile(
             title: Text(l10n.get('dynamic_memory')),
@@ -329,6 +431,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Widget _buildSection(String title, IconData icon, List<Widget> children) {
     return Card(
+      elevation: 0,
+      color: Theme.of(context).colorScheme.surfaceContainer,
       margin: const EdgeInsets.only(bottom: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

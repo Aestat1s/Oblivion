@@ -1,7 +1,7 @@
 name: "oblivion_launcher"
 description: "Obliv1on - A Minecraft Launcher"
 publish_to: "none"
-version: "1.0.1+2"
+version: "1.0.3+3"
 environment:
   sdk: ">=3.5.0 <4.0.0"
 dependencies:
@@ -24,6 +24,7 @@ dependencies:
   flutter_acrylic: ^1.1.4
   cached_network_image: ^3.3.1
   flutter_colorpicker: ^1.1.0
+  package_info_plus: ^9.0.0
 dev_dependencies:
   flutter_test:
     sdk: flutter

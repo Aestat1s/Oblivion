@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path/path.dart' as p;
@@ -565,7 +565,13 @@ class _ModsScreenState extends State<ModsScreen> with SingleTickerProviderStateM
         content: Text('${mod.displayName}?'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(dialogContext), child: Text(l10n.get('cancel'))),
-          FilledButton(onPressed: () async { await _modService.deleteMod(mod); Navigator.pop(dialogContext); setState(() {}); }, child: Text(l10n.get('delete'))),
+          FilledButton(onPressed: () async { 
+            await _modService.deleteMod(mod); 
+            if (dialogContext.mounted) {
+              Navigator.pop(dialogContext); 
+              setState(() {}); 
+            }
+          }, child: Text(l10n.get('delete'))),
         ],
       ),
     );
@@ -767,7 +773,7 @@ class _ModVersionsDialogState extends State<_ModVersionsDialog> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.15),
+        color: color.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(4),
       ),
       child: Text(label, style: TextStyle(fontSize: 10, color: color)),

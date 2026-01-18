@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
 class AppLocalizations {
   final Locale locale;
@@ -38,11 +38,11 @@ class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> 
   bool shouldReload(_AppLocalizationsDelegate old) => false;
 }
 
-const Map<String, String> _enStrings = { // powered by ai 大侠。
+const Map<String, String> _enStrings = { 
   
   'app_name': 'Oblivion Launcher',
   
-  // Personalization
+  
   'personalization': 'Personalization',
   'lang_en_native': 'English',
   'lang_zh_native': '简体中文',
@@ -277,6 +277,13 @@ const Map<String, String> _enStrings = { // powered by ai 大侠。
   'auto_complete_files_hint': 'Check and download missing game files',
   'window_size': 'Window Size',
   'fullscreen': 'Fullscreen',
+  'home_screen_settings': 'Home Screen',
+  'show_launch_log': 'Show Launch Log',
+  'show_launch_log_hint': 'Show game output log on home screen',
+  'show_right_panel': 'Show Right Panel',
+  'show_right_panel_hint': 'Show right panel on home screen',
+  'announcement_text': 'Announcement Text',
+  'announcement_text_hint': 'Custom announcement text',
   
   
   'about': 'About',
@@ -310,7 +317,7 @@ const Map<String, String> _enStrings = { // powered by ai 大侠。
   'load_popular': 'Load Popular Mods',
   'retry': 'Retry',
   
-  // Download Center
+  
   'download_center': 'Download Center',
   'resource_mod': 'Mods',
   'resource_modpack': 'Modpacks',
@@ -333,7 +340,7 @@ const Map<String, String> _zhStrings = {
   
   'app_name': 'Oblivion 启动器',
   
-  // 个性化
+  
   'personalization': '个性化',
   'lang_en_native': 'English',
   'lang_zh_native': '简体中文',
@@ -568,6 +575,13 @@ const Map<String, String> _zhStrings = {
   'auto_complete_files_hint': '检查并下载缺失的游戏文件',
   'window_size': '窗口大小',
   'fullscreen': '全屏',
+  'home_screen_settings': '首页设置',
+  'show_launch_log': '显示启动日志',
+  'show_launch_log_hint': '在首页显示游戏输出日志',
+  'show_right_panel': '显示右侧面板',
+  'show_right_panel_hint': '显示首页右侧面板',
+  'announcement_text': '公告文本',
+  'announcement_text_hint': '自定义首页公告内容',
   
   
   'about': '关于',
@@ -601,7 +615,7 @@ const Map<String, String> _zhStrings = {
   'load_popular': '加载热门模组',
   'retry': '重试',
   
-  // 下载中心
+  
   'download_center': '下载中心',
   'resource_mod': '模组',
   'resource_modpack': '整合包',

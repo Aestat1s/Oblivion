@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/download_task.dart';
 import '../services/download_service.dart';
@@ -23,10 +23,10 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
     final groups = downloadService.groups;
     final colorScheme = Theme.of(context).colorScheme;
 
-    // 根据背景设置决定背景颜色
+    
     final hasCustomBackground = settings.backgroundType != BackgroundType.none;
     final backgroundColor = hasCustomBackground 
-        ? colorScheme.surface.withOpacity(0.85)
+        ? colorScheme.surface.withValues(alpha: 0.85)
         : colorScheme.surface;
 
     return Scaffold(
@@ -65,14 +65,14 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 下载进度概览
+            
             if (downloadService.isDownloading)
               _buildOverviewCard(downloadService, colorScheme, l10n),
             
             if (downloadService.isDownloading)
               const SizedBox(height: 16),
             
-            // 下载列表
+            
             Expanded(
               child: groups.isEmpty
                   ? _buildEmptyState(colorScheme, l10n)
@@ -89,7 +89,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
     
     return Card(
       elevation: 0,
-      color: colorScheme.primaryContainer.withOpacity(0.3),
+      color: colorScheme.primaryContainer.withValues(alpha: 0.3),
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -204,9 +204,9 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
       elevation: 0,
       margin: const EdgeInsets.only(bottom: 12),
       color: isActive 
-          ? colorScheme.primaryContainer.withOpacity(0.15)
+          ? colorScheme.primaryContainer.withValues(alpha: 0.15)
           : isFailed 
-              ? colorScheme.errorContainer.withOpacity(0.15)
+              ? colorScheme.errorContainer.withValues(alpha: 0.15)
               : colorScheme.surfaceContainerLow,
       child: Theme(
         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
@@ -288,7 +288,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
                 child: ListView.separated(
                   shrinkWrap: true,
                   itemCount: group.tasks.length,
-                  separatorBuilder: (_, __) => Divider(height: 1, color: colorScheme.outlineVariant.withOpacity(0.3)),
+                  separatorBuilder: (_, __) => Divider(height: 1, color: colorScheme.outlineVariant.withValues(alpha: 0.3)),
                   itemBuilder: (context, index) => _buildTaskItem(group.tasks[index], colorScheme, l10n),
                 ),
               ),

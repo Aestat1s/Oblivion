@@ -33,6 +33,8 @@ class _PersonalizationSettingsState extends State<PersonalizationSettings> {
     final settings = config.settings;
 
     return Card(
+      elevation: 0,
+      color: Theme.of(context).colorScheme.surfaceContainer,
       margin: const EdgeInsets.only(bottom: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -229,7 +231,7 @@ class _PersonalizationSettingsState extends State<PersonalizationSettings> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(l10n.get('bg_blur')),
-                    Text('${settings.backgroundBlur.toStringAsFixed(1)}'),
+                    Text(settings.backgroundBlur.toStringAsFixed(1)),
                   ],
                 ),
                 Slider(
@@ -465,11 +467,12 @@ class _PersonalizationSettingsState extends State<PersonalizationSettings> {
           FilledButton(
             onPressed: () async {
               settings.themeColorSource = ThemeColorSource.manual;
+              
               settings.customThemeColor = pickerColor.value;
               config.save();
               await themeService.updateThemeColor(settings);
-              setState(() {});
-              Navigator.of(context).pop();
+              if (mounted) setState(() {});
+              if (context.mounted) Navigator.of(context).pop();
             },
             child: Text(l10n.get('confirm')),
           ),

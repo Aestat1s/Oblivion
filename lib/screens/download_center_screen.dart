@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path/path.dart' as p;
@@ -34,7 +34,7 @@ class _DownloadCenterScreenState extends State<DownloadCenterScreen> with Single
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 8, vsync: this); // 增加到8个标签
+    _tabController = TabController(length: 8, vsync: this); 
     _tabController.addListener(_onTabChanged);
   }
 
@@ -71,7 +71,7 @@ class _DownloadCenterScreenState extends State<DownloadCenterScreen> with Single
       if (type != null) {
         final service = context.read<ResourceDownloadService>();
         
-        // 世界类型只支持 CurseForge，自动切换
+        
         if (type == ResourceType.world && service.currentSource == ResourceSource.modrinth) {
           service.setSource(ResourceSource.curseforge);
         }
@@ -83,10 +83,10 @@ class _DownloadCenterScreenState extends State<DownloadCenterScreen> with Single
         _selectedCategory = null;
         _selectedLoader = null;
         
-        // 使用当前 index 来防止快速切换时的数据串扰
+        
         final searchIndex = currentIndex;
         _searchResources().then((_) {
-          // 如果在搜索完成后 tab 已经切换，忽略结果
+          
           if (_tabController.index != searchIndex) return;
           if (mounted) setState(() {});
         });
@@ -104,8 +104,8 @@ class _DownloadCenterScreenState extends State<DownloadCenterScreen> with Single
       3 => ResourceType.resourcePack,
       4 => ResourceType.world,
       5 => ResourceType.datapack,
-      6 => null, // 收藏
-      7 => null, // 版本下载
+      6 => null, 
+      7 => null, 
       _ => null,
     };
   }
@@ -139,7 +139,7 @@ class _DownloadCenterScreenState extends State<DownloadCenterScreen> with Single
               Expanded(
                 child: Text(l10n.get('nav_downloads'), style: Theme.of(context).textTheme.headlineMedium),
               ),
-              // 下载列表按钮
+              
               Badge(
                 isLabelVisible: hasActiveDownloads,
                 label: Text('${downloadService.groups.where((g) => g.status == DownloadStatus.downloading).length}'),
@@ -162,7 +162,7 @@ class _DownloadCenterScreenState extends State<DownloadCenterScreen> with Single
             ],
           ),
           const SizedBox(height: 16),
-          // MD3风格的标签栏
+          
           _buildTabBar(l10n),
           const SizedBox(height: 16),
           Expanded(
@@ -212,109 +212,129 @@ class _DownloadCenterScreenState extends State<DownloadCenterScreen> with Single
     final service = context.watch<ResourceDownloadService>();
 
     
-    // 世界类型只显示CurseForge
+    
     final showModrinth = type != ResourceType.world;
     
     return Column(
       children: [
-        // 搜索栏和过滤器行
-        Row(
-          children: [
-            // 搜索框
-            Expanded(
-              child: TextField(
-                controller: _searchController,
-                decoration: InputDecoration(
-                  hintText: l10n.get('search_resources'),
-                  prefixIcon: const Icon(Icons.search),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                ),
-                onSubmitted: (_) => _searchResources(),
-              ),
-            ),
-            const SizedBox(width: 12),
-            // 分类过滤
-            PopupMenuButton<String>(
-              icon: const Icon(Icons.category),
-              tooltip: l10n.get('cat_all'),
-              onSelected: (value) {
-                setState(() => _selectedCategory = value == 'all' ? null : value);
-                _searchResources();
-              },
-              itemBuilder: (context) => [
-                PopupMenuItem(value: 'all', child: Text(l10n.get('cat_all'))),
-                ...service.categories.map((c) => 
-                  PopupMenuItem(value: c.id, child: Text(_translateCategory(c.id)))),
-              ],
-            ),
-            // 加载器过滤（仅模组和整合包）
-            if (type == ResourceType.mod || type == ResourceType.modpack)
-              PopupMenuButton<String?>(
-                icon: const Icon(Icons.extension),
-                tooltip: l10n.get('mod_loader'),
-                onSelected: (value) {
-                  setState(() => _selectedLoader = value);
-                  _searchResources();
-                },
-                itemBuilder: (context) => [
-                  PopupMenuItem(value: null, child: Text(l10n.get('cat_all'))),
-                  const PopupMenuItem(value: 'fabric', child: Text('Fabric')),
-                  const PopupMenuItem(value: 'forge', child: Text('Forge')),
-                  const PopupMenuItem(value: 'quilt', child: Text('Quilt')),
-                  const PopupMenuItem(value: 'neoforge', child: Text('NeoForge')),
-                ],
-              ),
-            // 排序
-            PopupMenuButton<ResourceSortType>(
-              icon: const Icon(Icons.sort),
-              tooltip: l10n.get('sort_downloads'),
-              onSelected: (value) {
-                setState(() => _sortType = value);
-                _searchResources();
-              },
-              itemBuilder: (context) => [
-                PopupMenuItem(value: ResourceSortType.relevance, child: Text(l10n.get('sort_relevance'))),
-                PopupMenuItem(value: ResourceSortType.downloads, child: Text(l10n.get('sort_downloads'))),
-                PopupMenuItem(value: ResourceSortType.updated, child: Text(l10n.get('sort_updated'))),
-                PopupMenuItem(value: ResourceSortType.newest, child: Text(l10n.get('sort_newest'))),
-              ],
-            ),
-            const SizedBox(width: 8),
-            // 搜索按钮
-            FilledButton.icon(
-              onPressed: () => _searchResources(),
-              icon: const Icon(Icons.search),
-              label: Text(l10n.get('search')),
-            ),
-            const SizedBox(width: 12),
-            // API源选择（放在右侧）
-            SegmentedButton<ResourceSource>(
-              segments: [
-                if (showModrinth)
-                  ButtonSegment(
-                    value: ResourceSource.modrinth,
-                    label: const Text('Modrinth'),
-                    icon: const Icon(Icons.public, size: 18),
+        
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final width = constraints.maxWidth;
+            final showLabels = width > 760;
+            final showSearchLabel = width > 600;
+
+            return Row(
+              children: [
+                
+                Expanded(
+                  child: TextField(
+                    controller: _searchController,
+                    decoration: InputDecoration(
+                      hintText: l10n.get('search_resources'),
+                      prefixIcon: const Icon(Icons.search),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    ),
+                    onSubmitted: (_) => _searchResources(),
                   ),
-                ButtonSegment(
-                  value: ResourceSource.curseforge,
-                  label: const Text('CurseForge'),
-                  icon: const Icon(Icons.local_fire_department, size: 18),
+                ),
+                const SizedBox(width: 12),
+                
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.category),
+                  tooltip: l10n.get('cat_all'),
+                  onSelected: (value) {
+                    setState(() => _selectedCategory = value == 'all' ? null : value);
+                    _searchResources();
+                  },
+                  itemBuilder: (context) => [
+                    PopupMenuItem(value: 'all', child: Text(l10n.get('cat_all'))),
+                    ...service.categories.map((c) => 
+                      PopupMenuItem(value: c.id, child: Text(_translateCategory(c.id)))),
+                  ],
+                ),
+                
+                if (type == ResourceType.mod || type == ResourceType.modpack)
+                  PopupMenuButton<String?>(
+                    icon: const Icon(Icons.extension),
+                    tooltip: l10n.get('mod_loader'),
+                    onSelected: (value) {
+                      setState(() => _selectedLoader = value);
+                      _searchResources();
+                    },
+                    itemBuilder: (context) => [
+                      PopupMenuItem(value: null, child: Text(l10n.get('cat_all'))),
+                      const PopupMenuItem(value: 'fabric', child: Text('Fabric')),
+                      const PopupMenuItem(value: 'forge', child: Text('Forge')),
+                      const PopupMenuItem(value: 'quilt', child: Text('Quilt')),
+                      const PopupMenuItem(value: 'neoforge', child: Text('NeoForge')),
+                    ],
+                  ),
+                
+                PopupMenuButton<ResourceSortType>(
+                  icon: const Icon(Icons.sort),
+                  tooltip: l10n.get('sort_downloads'),
+                  onSelected: (value) {
+                    setState(() => _sortType = value);
+                    _searchResources();
+                  },
+                  itemBuilder: (context) => [
+                    PopupMenuItem(value: ResourceSortType.relevance, child: Text(l10n.get('sort_relevance'))),
+                    PopupMenuItem(value: ResourceSortType.downloads, child: Text(l10n.get('sort_downloads'))),
+                    PopupMenuItem(value: ResourceSortType.updated, child: Text(l10n.get('sort_updated'))),
+                    PopupMenuItem(value: ResourceSortType.newest, child: Text(l10n.get('sort_newest'))),
+                  ],
+                ),
+                const SizedBox(width: 8),
+                
+                if (showSearchLabel)
+                  FilledButton.icon(
+                    onPressed: () => _searchResources(),
+                    icon: const Icon(Icons.search),
+                    label: Text(l10n.get('search')),
+                  )
+                else
+                  FilledButton(
+                    onPressed: () => _searchResources(),
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size(48, 40),
+                      padding: EdgeInsets.zero,
+                    ),
+                    child: const Icon(Icons.search),
+                  ),
+                const SizedBox(width: 12),
+                
+                SegmentedButton<ResourceSource>(
+                  segments: [
+                    if (showModrinth)
+                      ButtonSegment(
+                        value: ResourceSource.modrinth,
+                        label: showLabels ? const Text('Modrinth') : null,
+                        tooltip: showLabels ? null : 'Modrinth',
+                        icon: const Icon(Icons.public, size: 18),
+                      ),
+                    ButtonSegment(
+                      value: ResourceSource.curseforge,
+                      label: showLabels ? const Text('CurseForge') : null,
+                      tooltip: showLabels ? null : 'CurseForge',
+                      icon: const Icon(Icons.local_fire_department, size: 18),
+                    ),
+                  ],
+                  selected: {service.currentSource},
+                  onSelectionChanged: (selected) {
+                    final newSource = selected.first;
+                    if (newSource == service.currentSource) return;
+                    service.setSource(newSource);
+                    _searchResources(page: 0);
+                  },
                 ),
               ],
-              selected: {service.currentSource},
-              onSelectionChanged: (selected) {
-                final newSource = selected.first;
-                if (newSource == service.currentSource) return;
-                service.setSource(newSource);
-                _searchResources(page: 0);
-              },
-            ),
-          ],
+            );
+          }
         ),
         const SizedBox(height: 16),
-        // 搜索结果
+        
         Expanded(
           child: service.isSearching
               ? const Center(child: CircularProgressIndicator())
@@ -443,7 +463,7 @@ class _DownloadCenterScreenState extends State<DownloadCenterScreen> with Single
     );
   }
 
-  // 分页栏（参考模组页面）
+  
   Widget _buildPaginationBar(ResourceDownloadService service) {
     final l10n = AppLocalizations.of(context);
     
@@ -455,7 +475,7 @@ class _DownloadCenterScreenState extends State<DownloadCenterScreen> with Single
       ),
       child: Row(
         children: [
-          // 分页控制
+          
           IconButton(
             onPressed: service.currentPage > 0 
                 ? () => _searchResources(page: service.currentPage - 1) 
@@ -473,7 +493,7 @@ class _DownloadCenterScreenState extends State<DownloadCenterScreen> with Single
             tooltip: l10n.get('page'),
           ),
           const Spacer(),
-          // 批量操作指示器（缩小版）
+          
           if (_selectedItems.isNotEmpty) ...[
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -599,14 +619,14 @@ class _DownloadCenterScreenState extends State<DownloadCenterScreen> with Single
     );
   }
 
-  // 版本下载标签页
+  
   Widget _buildVersionDownloadTab() {
     final l10n = AppLocalizations.of(context);
     final gameService = context.watch<GameService>();
     
     return Column(
       children: [
-        // 过滤器
+        
         Row(
           children: [
             FilterChip(
@@ -781,9 +801,9 @@ class _DownloadCenterScreenState extends State<DownloadCenterScreen> with Single
     if (!mounted) return;
     final l10n = AppLocalizations.of(context);
     
-    // 如果是整合包，显示安装对话框
+    
     if (item.type == ResourceType.modpack) {
-      Navigator.pop(context); // 关闭版本选择对话框
+      Navigator.pop(context); 
       _showModpackInstallDialog(item, version);
       return;
     }
@@ -946,7 +966,7 @@ class _DownloadCenterScreenState extends State<DownloadCenterScreen> with Single
 }
 
 
-// 资源版本选择对话框
+
 class _ResourceVersionsDialog extends StatefulWidget {
   final ResourceItem item;
   final ResourceDownloadService service;
@@ -983,7 +1003,7 @@ class _ResourceVersionsDialogState extends State<_ResourceVersionsDialog> {
 
   Future<void> _loadVersions() async {
     try {
-      // 使用资源项本身的 source，而不是当前选中的 source
+      
       final versions = await widget.service.getResourceVersions(
         widget.item.id,
         source: widget.item.source,
@@ -1114,7 +1134,7 @@ class _ResourceVersionsDialogState extends State<_ResourceVersionsDialog> {
 }
 
 
-// 批量下载对话框
+
 class _BatchDownloadDialog extends StatefulWidget {
   final List<ResourceItem> items;
   final ResourceDownloadService service;
@@ -1147,7 +1167,7 @@ class _BatchDownloadDialogState extends State<_BatchDownloadDialog> {
     for (final item in widget.items) {
       setState(() => _loadingVersions[item.id] = true);
       try {
-        // 使用资源项本身的 source，而不是当前选中的 source
+        
         final versions = await widget.service.getResourceVersions(
           item.id,
           source: item.source,
@@ -1303,7 +1323,7 @@ class _BatchDownloadDialogState extends State<_BatchDownloadDialog> {
 }
 
 
-// 版本安装对话框
+
 class _InstallVersionDialog extends StatefulWidget {
   final GameVersion version;
   const _InstallVersionDialog({required this.version});
@@ -1319,9 +1339,9 @@ class _InstallVersionDialogState extends State<_InstallVersionDialog> {
   double _progress = 0;
 
   final _nameController = TextEditingController();
-  String? _selectedFabric;
-  String? _selectedForge;
-  String? _selectedQuilt;
+  String? _selectedFabric;  
+  String? _selectedForge;   
+  String? _selectedQuilt;   
   IsolationType _isolation = IsolationType.none;
 
   List<ModLoaderVersion> _fabricVersions = [];
@@ -1329,6 +1349,34 @@ class _InstallVersionDialogState extends State<_InstallVersionDialog> {
   List<ModLoaderVersion> _quiltVersions = [];
 
   int _selectedLoader = 0;
+
+  
+  ModLoaderVersion? _getSelectedForgeVersion() {
+    if (_selectedForge == null) return null;
+    try {
+      return _forgeVersions.firstWhere((v) => v.uniqueId == _selectedForge);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  ModLoaderVersion? _getSelectedFabricVersion() {
+    if (_selectedFabric == null) return null;
+    try {
+      return _fabricVersions.firstWhere((v) => v.uniqueId == _selectedFabric);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  ModLoaderVersion? _getSelectedQuiltVersion() {
+    if (_selectedQuilt == null) return null;
+    try {
+      return _quiltVersions.firstWhere((v) => v.uniqueId == _selectedQuilt);
+    } catch (_) {
+      return null;
+    }
+  }
 
   @override
   void initState() {
@@ -1454,19 +1502,28 @@ class _InstallVersionDialogState extends State<_InstallVersionDialog> {
     return DropdownButtonFormField<String>(
       decoration: InputDecoration(labelText: '$name 版本'),
       value: selected,
-      items: versions.map((v) => DropdownMenuItem(value: v.version, child: Text(v.version))).toList(),
+      items: versions.map((v) => DropdownMenuItem(value: v.uniqueId, child: Text(v.displayName))).toList(),
       onChanged: onChanged,
     );
   }
 
   void _updateVersionName() {
     String name = widget.version.id;
-    if (_selectedLoader == 1 && _selectedFabric != null) {
-      name = '$name-fabric-$_selectedFabric';
-    } else if (_selectedLoader == 2 && _selectedForge != null) {
-      name = '$name-forge-$_selectedForge';
-    } else if (_selectedLoader == 3 && _selectedQuilt != null) {
-      name = '$name-quilt-$_selectedQuilt';
+    if (_selectedLoader == 1) {
+      final fabric = _getSelectedFabricVersion();
+      if (fabric != null) {
+        name = '$name-fabric-${fabric.version}';
+      }
+    } else if (_selectedLoader == 2) {
+      final forge = _getSelectedForgeVersion();
+      if (forge != null) {
+        name = '$name-forge-${forge.version}';
+      }
+    } else if (_selectedLoader == 3) {
+      final quilt = _getSelectedQuiltVersion();
+      if (quilt != null) {
+        name = '$name-quilt-${quilt.version}';
+      }
     }
     _nameController.text = name;
   }
@@ -1480,14 +1537,19 @@ class _InstallVersionDialogState extends State<_InstallVersionDialog> {
 
     final gameService = context.read<GameService>();
     
+    
+    final fabricVersion = _selectedLoader == 1 ? _getSelectedFabricVersion()?.version : null;
+    final forgeVersion = _selectedLoader == 2 ? _getSelectedForgeVersion()?.version : null;
+    final quiltVersion = _selectedLoader == 3 ? _getSelectedQuiltVersion()?.version : null;
+    
     try {
       await gameService.installVersion(
         widget.version,
         customName: _nameController.text,
         isolation: _isolation,
-        fabric: _selectedLoader == 1 ? _selectedFabric : null,
-        forge: _selectedLoader == 2 ? _selectedForge : null,
-        quilt: _selectedLoader == 3 ? _selectedQuilt : null,
+        fabric: fabricVersion,
+        forge: forgeVersion,
+        quilt: quiltVersion,
         onProgress: (progress) {
           if (mounted) {
             setState(() {
@@ -1522,7 +1584,7 @@ class _InstallVersionDialogState extends State<_InstallVersionDialog> {
 }
 
 
-// 整合包安装对话框
+
 class _ModpackInstallDialog extends StatefulWidget {
   final ResourceItem item;
   final ResourceVersion version;
@@ -1545,7 +1607,7 @@ class _ModpackInstallDialogState extends State<_ModpackInstallDialog> {
   @override
   void initState() {
     super.initState();
-    // 使用整合包名称作为默认实例名
+    
     _nameController.text = _sanitizeInstanceName(widget.item.title);
   }
 
@@ -1556,7 +1618,7 @@ class _ModpackInstallDialogState extends State<_ModpackInstallDialog> {
   }
 
   String _sanitizeInstanceName(String name) {
-    // 移除不允许的字符
+    
     return name
         .replaceAll(RegExp(r'[<>:"/\\|?*]'), '')
         .replaceAll(RegExp(r'\s+'), ' ')
@@ -1604,7 +1666,7 @@ class _ModpackInstallDialogState extends State<_ModpackInstallDialog> {
             SnackBar(content: Text('${_nameController.text} ${l10n.get('completed')}')),
           );
         } else {
-          // 安装失败时自动导出日志
+          
           _exportLogs();
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -1621,7 +1683,7 @@ class _ModpackInstallDialogState extends State<_ModpackInstallDialog> {
           _isInstalling = false;
           _status = '安装失败: $e';
         });
-        // 导出日志
+        
         _exportLogs();
       }
     }
@@ -1694,7 +1756,7 @@ class _ModpackInstallDialogState extends State<_ModpackInstallDialog> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 整合包信息
+        
         Row(
           children: [
             if (widget.item.iconUrl != null)
@@ -1749,7 +1811,7 @@ class _ModpackInstallDialogState extends State<_ModpackInstallDialog> {
           ],
         ),
         const SizedBox(height: 24),
-        // 实例名称
+        
         TextField(
           controller: _nameController,
           decoration: InputDecoration(
@@ -1759,11 +1821,11 @@ class _ModpackInstallDialogState extends State<_ModpackInstallDialog> {
           ),
         ),
         const SizedBox(height: 16),
-        // 提示信息
+        
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.3),
+            color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Row(

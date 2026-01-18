@@ -1,9 +1,10 @@
-﻿enum DownloadStatus { pending, downloading, completed, failed, cancelled }
+enum DownloadStatus { pending, downloading, completed, failed, cancelled }
 
 class DownloadTask {
   final String id;
   final String name;
   final String url;
+  final List<String> fallbackUrls;
   final String destinationPath;
   final String? sha1;
   int totalBytes;
@@ -18,6 +19,7 @@ class DownloadTask {
     String? id,
     required this.name,
     required this.url,
+    this.fallbackUrls = const [],
     required this.destinationPath,
     this.sha1,
     this.totalBytes = 0,

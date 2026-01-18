@@ -142,4 +142,11 @@ class ModLoaderVersion {
     this.stable = true,
     this.buildNumber,
   });
+
+  
+  
+  String get uniqueId => buildNumber != null ? buildNumber.toString() : version;
+
+  
+  String get displayName => version;
 }

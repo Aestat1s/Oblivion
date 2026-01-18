@@ -24,7 +24,13 @@ class ThemeService extends ChangeNotifier {
 
   Future<void> initialize(GlobalSettings settings) async {
     debugLog('ThemeService initializing...');
-    await _loadCachedBackground();
+    
+    if (settings.backgroundType == BackgroundType.randomImage) {
+      await fetchRandomBackground(settings);
+    } else {
+      await _loadCachedBackground();
+    }
+
     await updateThemeColor(settings);
     debugLog('ThemeService initialized, seedColor: $_seedColor');
   }

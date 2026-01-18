@@ -1,7 +1,8 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'screens/main_screen.dart';
+import 'screens/bootstrap_screen.dart';
 import 'services/config_service.dart';
 import 'services/theme_service.dart';
 import 'models/config.dart';
@@ -24,13 +25,13 @@ class OblivionApp extends StatelessWidget {
         ? const Locale('zh') 
         : const Locale('en');
 
-    // Use custom seed color from ThemeService if available
+    
     final seedColor = themeService.seedColor ?? const Color(0xFF6750A4);
     
-    // Check if we have a custom background
+    
     final hasCustomBackground = settings.backgroundType != BackgroundType.none;
     
-    // Surface opacity for controls when background is enabled
+    
     final surfaceOpacity = hasCustomBackground ? 0.85 : 1.0;
     
     final colorScheme = ColorScheme.fromSeed(
@@ -99,7 +100,8 @@ class OblivionApp extends StatelessWidget {
           backgroundColor: colorScheme.surfaceContainerLow.withValues(alpha: surfaceOpacity),
         ),
       ),
-      home: const MainScreen(),
+      themeMode: themeMode,
+      home: settings.isFirstRun ? const BootstrapScreen() : const MainScreen(),
     );
   }
 }

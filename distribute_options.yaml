@@ -8,7 +8,9 @@ releases:
           target: exe
           build_args:
             release: true
-            
+            dart-define:
+              "UMAMI_ID": ""
+
   - name: windows-installer
     jobs:
       - name: windows-inno
@@ -17,3 +19,43 @@ releases:
           target: inno
           build_args:
             release: true
+            dart-define:
+              "UMAMI_ID": ""
+
+  - name: linux-release
+    jobs:
+      - name: linux-deb
+        package:
+          platform: linux
+          target: deb
+          build_args:
+            release: true
+            dart-define:
+              "UMAMI_ID": ""
+      - name: linux-appimage
+        package:
+          platform: linux
+          target: appimage
+          build_args:
+            release: true
+            dart-define:
+              "UMAMI_ID": ""
+
+  - name: macos-release
+    jobs:
+      - name: macos-dmg
+        package:
+          platform: macos
+          target: dmg
+          build_args:
+            release: true
+            dart-define:
+              "UMAMI_ID": ""
+      - name: macos-zip
+        package:
+          platform: macos
+          target: zip
+          build_args:
+            release: true
+            dart-define:
+              "UMAMI_ID": ""
