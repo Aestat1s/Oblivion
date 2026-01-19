@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:window_manager/window_manager.dart';
 import '../models/download_task.dart';
 import '../services/download_service.dart';
 import '../services/config_service.dart';
@@ -34,6 +35,15 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
+        flexibleSpace: GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          onPanStart: (details) {
+            windowManager.startDragging();
+          },
+          child: Container(
+            color: Colors.transparent,
+          ),
+        ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.of(context).pop(),

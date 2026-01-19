@@ -143,7 +143,7 @@ Future<void> applyWindowEffect(GlobalSettings settings) async {
 }
 
 Future<void> applyWindowOpacity(double opacity) async {
-  if (!Platform.isWindows) return;
+  // if (!Platform.isWindows) return;
   
   try {
     await windowManager.setOpacity(opacity.clamp(0.3, 1.0));

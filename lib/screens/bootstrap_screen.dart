@@ -11,6 +11,7 @@ import '../models/config.dart';
 import '../models/game_version.dart';
 import '../widgets/add_account_dialog.dart';
 import 'main_screen.dart';
+import '../l10n/app_localizations.dart';
 
 class BootstrapScreen extends StatefulWidget {
   const BootstrapScreen({super.key});
@@ -20,17 +21,29 @@ class BootstrapScreen extends StatefulWidget {
 }
 
 class _BootstrapScreenState extends State<BootstrapScreen> {
-  final PageController _pageController = PageController();
+  late PageController _pageController;
   int _currentPage = 0;
   
   // Total pages: Intro, Account, Personalization, Install Version, Analytics, Links
   static const int _totalPages = 6;
 
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController();
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
   void _nextPage() {
     if (_currentPage < _totalPages - 1) {
       _pageController.nextPage(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeInOutCubicEmphasized,
       );
     } else {
       _finishBootstrap();
@@ -40,8 +53,8 @@ class _BootstrapScreenState extends State<BootstrapScreen> {
   void _prevPage() {
     if (_currentPage > 0) {
       _pageController.previousPage(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeInOutCubicEmphasized,
       );
     }
   }
@@ -59,34 +72,30 @@ class _BootstrapScreenState extends State<BootstrapScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
       body: Row(
         children: [
-          // Left side: Progress or Graphic?
-          // For now, let's just use a simple PageView with a bottom bar.
-          // Or maybe a side stepper? Material 3 doesn't have a strict side stepper, 
-          // but let's stick to a clean centered layout or split layout.
-          // Given desktop, a split layout looks nice.
           Expanded(
             child: Column(
               children: [
                 Expanded(
-                  child: PageView(
-                    controller: _pageController,
-                    physics: const NeverScrollableScrollPhysics(), // Disable swipe
-                    onPageChanged: (page) => setState(() => _currentPage = page),
-                    children: [
-                      const _IntroPage(),
-                      const _AccountPage(),
-                      const _PersonalizationPage(),
-                      const _InstallVersionPage(),
-                      const _AnalyticsPage(),
-                      const _LinksPage(),
-                    ],
-                  ),
+                  child: PageView.builder(
+                controller: _pageController,
+                physics: const NeverScrollableScrollPhysics(),
+                onPageChanged: (page) {
+                  setState(() {
+                    _currentPage = page;
+                  });
+                },
+                itemCount: _totalPages,
+                itemBuilder: (context, index) {
+                  return _getPage(index);
+                },
+              ),
                 ),
-                _buildBottomBar(),
+                _buildBottomBar(l10n),
               ],
             ),
           ),
@@ -95,7 +104,19 @@ class _BootstrapScreenState extends State<BootstrapScreen> {
     );
   }
 
-  Widget _buildBottomBar() {
+  Widget _getPage(int index) {
+    switch (index) {
+      case 0: return const _IntroPage();
+      case 1: return const _AccountPage();
+      case 2: return const _PersonalizationPage();
+      case 3: return const _InstallVersionPage();
+      case 4: return const _AnalyticsPage();
+      case 5: return const _LinksPage();
+      default: return const SizedBox.shrink();
+    }
+  }
+
+  Widget _buildBottomBar(AppLocalizations l10n) {
     return Container(
       padding: const EdgeInsets.all(24.0),
       decoration: BoxDecoration(
@@ -110,7 +131,7 @@ class _BootstrapScreenState extends State<BootstrapScreen> {
           if (_currentPage > 0)
             TextButton(
               onPressed: _prevPage,
-              child: const Text('上一步'),
+              child: Text(l10n.get('previous')),
             )
           else
             const SizedBox.shrink(),
@@ -119,12 +140,14 @@ class _BootstrapScreenState extends State<BootstrapScreen> {
             children: [
               // Page indicator
               for (int i = 0; i < _totalPages; i++)
-                Container(
-                  width: 8,
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeInOut,
+                  width: i == _currentPage ? 24 : 8,
                   height: 8,
                   margin: const EdgeInsets.symmetric(horizontal: 4),
                   decoration: BoxDecoration(
-                    shape: BoxShape.circle,
+                    borderRadius: BorderRadius.circular(4),
                     color: i == _currentPage
                         ? Theme.of(context).colorScheme.primary
                         : Theme.of(context).colorScheme.surfaceContainerHighest,
@@ -133,7 +156,7 @@ class _BootstrapScreenState extends State<BootstrapScreen> {
               const SizedBox(width: 24),
               FilledButton(
                 onPressed: _canProceed() ? _nextPage : null,
-                child: Text(_currentPage == _totalPages - 1 ? '开始旅程' : '下一步'),
+                child: Text(_currentPage == _totalPages - 1 ? l10n.get('finish') : l10n.get('next')),
               ),
             ],
           ),
@@ -157,6 +180,9 @@ class _IntroPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final configService = context.watch<ConfigService>();
+    
     return Padding(
       padding: const EdgeInsets.all(48.0),
       child: Column(
@@ -166,18 +192,43 @@ class _IntroPage extends StatelessWidget {
           Icon(Icons.rocket_launch, size: 64, color: Theme.of(context).colorScheme.primary),
           const SizedBox(height: 32),
           Text(
-            '欢迎使用 Oblivion Launcher',
+            l10n.get('welcome'),
             style: Theme.of(context).textTheme.displaySmall?.copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 16),
           Text(
-            '一个现代化的、类 Material Design 3 风格的 Minecraft 启动器。',
+            l10n.get('welcome_desc'),
             style: Theme.of(context).textTheme.headlineSmall,
           ),
           const SizedBox(height: 24),
-          Text(
-            '你可以轻松管理游戏版本、模组、账号，并享受神奇牛的屎山体验。',
-            style: Theme.of(context).textTheme.bodyLarge,
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surfaceContainer,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.language, color: Theme.of(context).colorScheme.primary),
+                const SizedBox(width: 12),
+                Text(l10n.get('choose_language')),
+                const SizedBox(width: 16),
+                DropdownButton<String>(
+                  value: ['en', 'zh'].contains(configService.settings.language) ? configService.settings.language : 'zh',
+                  underline: const SizedBox.shrink(),
+                  items: const [
+                    DropdownMenuItem(value: 'en', child: Text('English')),
+                    DropdownMenuItem(value: 'zh', child: Text('简体中文')),
+                  ],
+                  onChanged: (value) {
+                    if (value != null) {
+                      configService.updateSettings(configService.settings.copyWith(language: value));
+                    }
+                  },
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -299,16 +350,44 @@ class _PersonalizationPage extends StatelessWidget {
           const SizedBox(height: 24),
 
           // Background
-          SwitchListTile(
-            title: const Text('自定义背景'),
-            value: settings.backgroundType != BackgroundType.none,
-            onChanged: (value) {
-              final newType = value ? BackgroundType.image : BackgroundType.none;
-              final newSettings = settings.copyWith(backgroundType: newType);
+          Text('背景设置', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 8),
+          SegmentedButton<BackgroundType>(
+            segments: const [
+              ButtonSegment(value: BackgroundType.none, label: Text('默认'), icon: Icon(Icons.block)),
+              ButtonSegment(value: BackgroundType.image, label: Text('图片'), icon: Icon(Icons.image)),
+              ButtonSegment(value: BackgroundType.randomImage, label: Text('随机'), icon: Icon(Icons.shuffle)),
+            ],
+            selected: {settings.backgroundType},
+            onSelectionChanged: (Set<BackgroundType> newSelection) {
+              final newType = newSelection.first;
+              var newSettings = settings.copyWith(backgroundType: newType);
+              if (newType == BackgroundType.randomImage && (newSettings.randomImageApi == null || newSettings.randomImageApi!.isEmpty)) {
+                 newSettings = newSettings.copyWith(randomImageApi: 'https://bing.img.run/rand.php');
+              }
               configService.updateSettings(newSettings);
               themeService.extractColorFromCurrentBackground(newSettings);
             },
           ),
+          const SizedBox(height: 16),
+
+          if (settings.backgroundType == BackgroundType.randomImage)
+            TextField(
+              decoration: const InputDecoration(
+                labelText: '随机图片 API',
+                hintText: 'https://bing.img.run/rand.php',
+                prefixIcon: Icon(Icons.link),
+              ),
+              controller: TextEditingController(text: settings.randomImageApi)
+                ..selection = TextSelection.collapsed(offset: settings.randomImageApi?.length ?? 0),
+              onChanged: (value) {
+                configService.updateSettings(settings.copyWith(randomImageApi: value));
+              },
+              onSubmitted: (value) {
+                 themeService.extractColorFromCurrentBackground(settings.copyWith(randomImageApi: value));
+              },
+            ),
+
           if (settings.backgroundType == BackgroundType.image)
             Padding(
               padding: const EdgeInsets.only(left: 16.0),

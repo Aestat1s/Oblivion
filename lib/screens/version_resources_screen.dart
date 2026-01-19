@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:desktop_drop/desktop_drop.dart';
+import 'package:window_manager/window_manager.dart';
 import '../services/resource_service.dart';
 import '../services/game_service.dart';
+import '../services/config_service.dart';
 import '../models/game_version.dart';
+import '../models/config.dart';
 import '../l10n/app_localizations.dart';
 import 'datapack_management_screen.dart';
 
@@ -44,16 +47,39 @@ class _VersionResourcesScreenState extends State<VersionResourcesScreen> with Si
   @override
   Widget build(BuildContext context) {
     final resourceService = context.watch<ResourceService>();
+    final configService = context.watch<ConfigService>();
+    final settings = configService.settings;
     final colorScheme = Theme.of(context).colorScheme;
 
+    final hasCustomBackground = settings.backgroundType != BackgroundType.none;
+    final backgroundColor = hasCustomBackground 
+        ? colorScheme.surface.withValues(alpha: 0.85)
+        : null;
+
     return Scaffold(
+      backgroundColor: backgroundColor,
       appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('资源管理', style: TextStyle(fontSize: 16)),
-            Text(widget.version.id, style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant)),
-          ],
+        backgroundColor: Colors.transparent,
+        flexibleSpace: GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          onPanStart: (details) => windowManager.startDragging(),
+        ),
+        title: GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          onPanStart: (details) {
+            windowManager.startDragging();
+          },
+          child: Container(
+            width: double.infinity,
+            color: Colors.transparent,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('资源管理', style: TextStyle(fontSize: 16)),
+                Text(widget.version.id, style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant)),
+              ],
+            ),
+          ),
         ),
         bottom: TabBar(
           controller: _tabController,

@@ -240,7 +240,7 @@ const Map<String, String> _enStrings = {
 
   
   'download_management': 'Download Management',
-  'no_downloads': 'No download tasks',
+  'no_downloads': 'No tasks',
   'download_hint': 'Download tasks will appear here',
   'stop_all': 'Stop All',
   'clear_completed': 'Clear Completed',
@@ -334,6 +334,16 @@ const Map<String, String> _enStrings = {
   'batch_download_success': 'Batch download completed',
   'batch_download_failed': 'Batch download failed',
   'select_download_location': 'Select Download Location',
+  'restart_setup': 'Restart Setup',
+  'restart_setup_confirm': 'Are you sure you want to restart the setup wizard? This will not delete your data but will reset local preferences.',
+  'welcome': 'Welcome',
+  'welcome_desc': 'Let\'s set up your launcher',
+  'choose_language': 'Choose Language',
+  'next': 'Next',
+  'previous': 'Previous',
+  'finish': 'Finish',
+  'enable_animations': 'Enable Animations',
+  'enable_animations_hint': 'Enable smooth transition animations',
 };
 
 const Map<String, String> _zhStrings = {
@@ -538,7 +548,7 @@ const Map<String, String> _zhStrings = {
   
   
   'download_management': '下载管理',
-  'no_downloads': '暂无下载任务',
+  'no_downloads': '暂无任务',
   'download_hint': '下载游戏版本或资源时将显示在这里',
   'stop_all': '停止所有',
   'clear_completed': '清除已完成',
@@ -632,4 +642,15 @@ const Map<String, String> _zhStrings = {
   'batch_download_success': '批量下载完成',
   'batch_download_failed': '批量下载失败',
   'select_download_location': '选择下载位置',
+
+  'restart_setup': '重新运行引导',
+  'restart_setup_confirm': '确定要重新运行引导向导吗？这将重置您的偏好设置，但不会删除数据。',
+  'welcome': '欢迎',
+  'welcome_desc': '让我们开始设置您的启动器',
+  'choose_language': '选择语言',
+  'next': '下一步',
+  'previous': '上一步',
+  'finish': '完成',
+  'enable_animations': '启用动画',
+  'enable_animations_hint': '启用平滑过渡动画',
 };

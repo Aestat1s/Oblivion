@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import '../services/config_service.dart';
 import '../services/java_service.dart';
 import '../services/update_service.dart';
+import 'bootstrap_screen.dart';
 import '../models/config.dart';
 import '../l10n/app_localizations.dart';
 import '../widgets/personalization_settings.dart';
@@ -22,6 +23,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<JavaService>().scanJava();
     });
+  }
+
+  Future<void> _restartSetup(ConfigService config, AppLocalizations l10n) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(l10n.get('restart_setup')),
+        content: Text(l10n.get('restart_setup_confirm')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(l10n.get('cancel')),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(l10n.get('confirm')),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      config.settings.isFirstRun = true;
+      await config.save();
+      if (!mounted) return;
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const BootstrapScreen()),
+        (route) => false,
+      );
+    }
   }
 
   @override
@@ -423,6 +454,42 @@ class _SettingsScreenState extends State<SettingsScreen> {
               config.save();
               setState(() {});
             },
+          ),
+        ]),
+        _buildSection(l10n.get('general_settings'), Icons.settings, [
+          ListTile(
+            title: Text(l10n.get('restart_setup')),
+            trailing: FilledButton.tonal(
+              onPressed: () {
+                showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: Text(l10n.get('restart_setup')),
+                    content: Text(l10n.get('restart_setup_confirm')),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: Text(l10n.get('cancel')),
+                      ),
+                      FilledButton(
+                        onPressed: () async {
+                           config.settings.isFirstRun = true;
+                           await config.save();
+                           if (context.mounted) {
+                             Navigator.of(context).pushAndRemoveUntil(
+                               MaterialPageRoute(builder: (_) => const BootstrapScreen()),
+                               (route) => false,
+                             );
+                           }
+                        },
+                        child: Text(l10n.get('confirm')),
+                      ),
+                    ],
+                  ),
+                );
+              },
+              child: Text(l10n.get('restart_setup')),
+            ),
           ),
         ]),
       ],

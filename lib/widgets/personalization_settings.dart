@@ -77,6 +77,15 @@ class _PersonalizationSettingsState extends State<PersonalizationSettings> {
               },
             ),
           ),
+          SwitchListTile(
+            title: Text(l10n.get('enable_animations')),
+            subtitle: Text(l10n.get('enable_animations_hint')),
+            value: settings.enableAnimations,
+            onChanged: (value) {
+              config.setEnableAnimations(value);
+              setState(() {});
+            },
+          ),
           
           const Divider(),
           _buildBackgroundSection(settings, config, themeService, l10n),

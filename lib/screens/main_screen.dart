@@ -112,7 +112,31 @@ class _MainScreenState extends State<MainScreen> {
                   children: [
                     if (useRail) _buildNavigationRail(destinations, settings),
                     Expanded(
-                      child: _screens[_selectedIndex],
+                      child: AnimatedSwitcher(
+                        duration: settings.enableAnimations 
+                            ? const Duration(milliseconds: 300) 
+                            : Duration.zero,
+                        reverseDuration: settings.enableAnimations 
+                            ? const Duration(milliseconds: 150) 
+                            : Duration.zero,
+                        switchInCurve: Curves.easeOutCubic,
+                        switchOutCurve: Curves.easeInCubic,
+                        transitionBuilder: (child, animation) {
+                          return FadeTransition(
+                            opacity: animation,
+                            child: ScaleTransition(
+                              scale: Tween<double>(begin: 0.95, end: 1.0).animate(
+                                CurvedAnimation(parent: animation, curve: Curves.easeOutCubic)
+                              ),
+                              child: child,
+                            ),
+                          );
+                        },
+                        child: Container(
+                          key: ValueKey<int>(_selectedIndex),
+                          child: _screens[_selectedIndex],
+                        ),
+                      ),
                     ),
                   ],
                 ),

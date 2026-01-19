@@ -1,4 +1,4 @@
-﻿import 'dart:convert';
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
@@ -80,6 +80,11 @@ class ConfigService extends ChangeNotifier {
 
   void setConcurrentDownloads(int count) {
     _config.globalSettings.concurrentDownloads = count;
+    save();
+  }
+
+  void setEnableAnimations(bool enable) {
+    _config.globalSettings.enableAnimations = enable;
     save();
   }
 }

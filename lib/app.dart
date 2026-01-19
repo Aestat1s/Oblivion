@@ -99,9 +99,41 @@ class OblivionApp extends StatelessWidget {
         navigationBarTheme: NavigationBarThemeData(
           backgroundColor: colorScheme.surfaceContainerLow.withValues(alpha: surfaceOpacity),
         ),
+        pageTransitionsTheme: PageTransitionsTheme(
+          builders: settings.enableAnimations
+              ? {
+                  TargetPlatform.android: const ZoomPageTransitionsBuilder(),
+                  TargetPlatform.iOS: const ZoomPageTransitionsBuilder(),
+                  TargetPlatform.macOS: const ZoomPageTransitionsBuilder(),
+                  TargetPlatform.windows: const ZoomPageTransitionsBuilder(),
+                  TargetPlatform.linux: const ZoomPageTransitionsBuilder(),
+                }
+              : {
+                  TargetPlatform.android: const NoPageTransitionsBuilder(),
+                  TargetPlatform.iOS: const NoPageTransitionsBuilder(),
+                  TargetPlatform.macOS: const NoPageTransitionsBuilder(),
+                  TargetPlatform.windows: const NoPageTransitionsBuilder(),
+                  TargetPlatform.linux: const NoPageTransitionsBuilder(),
+                },
+        ),
       ),
       themeMode: themeMode,
       home: settings.isFirstRun ? const BootstrapScreen() : const MainScreen(),
     );
+  }
+}
+
+class NoPageTransitionsBuilder extends PageTransitionsBuilder {
+  const NoPageTransitionsBuilder();
+
+  @override
+  Widget buildTransitions<T>(
+    PageRoute<T> route,
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
+    return child;
   }
 }

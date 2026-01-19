@@ -83,6 +83,7 @@ class GlobalSettings {
   bool showAnnouncement;
   bool enableAnalytics;
   bool isFirstRun;
+  bool enableAnimations;
 
   GlobalSettings({
     this.gameDirectory = '',
@@ -106,9 +107,9 @@ class GlobalSettings {
     this.defaultIsolation = IsolationType.none,
     
     
-    this.backgroundType = BackgroundType.none,
+    this.backgroundType = BackgroundType.randomImage,
     this.customBackgroundPath,
-    this.randomImageApi,
+    this.randomImageApi = 'https://bing.img.run/rand.php',
     this.backgroundBlur = 0.0,
     this.enableCustomColor = true,
     this.themeColorSource = ThemeColorSource.system,
@@ -121,6 +122,7 @@ class GlobalSettings {
     this.showAnnouncement = true,
     this.enableAnalytics = true,
     this.isFirstRun = true,
+    this.enableAnimations = true,
   });
 
   GlobalSettings copyWith({
@@ -158,6 +160,7 @@ class GlobalSettings {
     bool? showAnnouncement,
     bool? enableAnalytics,
     bool? isFirstRun,
+    bool? enableAnimations,
   }) {
     return GlobalSettings(
       gameDirectory: gameDirectory ?? this.gameDirectory,
@@ -194,6 +197,7 @@ class GlobalSettings {
       showAnnouncement: showAnnouncement ?? this.showAnnouncement,
       enableAnalytics: enableAnalytics ?? this.enableAnalytics,
       isFirstRun: isFirstRun ?? this.isFirstRun,
+      enableAnimations: enableAnimations ?? this.enableAnimations,
     );
   }
 
@@ -232,6 +236,7 @@ class GlobalSettings {
     'showAnnouncement': showAnnouncement,
     'enableAnalytics': enableAnalytics,
     'isFirstRun': isFirstRun,
+    'enableAnimations': enableAnimations,
   };
 
   factory GlobalSettings.fromJson(Map<String, dynamic> json) => GlobalSettings(
@@ -269,6 +274,7 @@ class GlobalSettings {
     showAnnouncement: json['showAnnouncement'] ?? true,
     enableAnalytics: json['enableAnalytics'] ?? true,
     isFirstRun: json['isFirstRun'] ?? true,
+    enableAnimations: json['enableAnimations'] ?? true,
   );
 }
 
