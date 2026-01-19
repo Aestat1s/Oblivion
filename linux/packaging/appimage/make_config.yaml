@@ -13,3 +13,6 @@ version: 1.0.3
 build_number: 1
 app_id: com.oblivion.launcher
 identifier: com.oblivion.launcher
+categories:
+  - Game
+
