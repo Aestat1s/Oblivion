@@ -36,6 +36,11 @@ jobs:
       - name: Install Flutter Distributor
         run: dart pub global activate flutter_distributor
 
+      - name: Install appimagetool
+        run: |
+          sudo wget https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage -O /usr/local/bin/appimagetool
+          sudo chmod +x /usr/local/bin/appimagetool
+
       - name: Build Linux app
         run: flutter_distributor package --platform linux --targets deb,appimage
 
